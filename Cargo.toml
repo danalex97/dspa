@@ -7,6 +7,6 @@ edition = "2018"
 [dependencies]
 chrono = "0.4"
 csv = "1"
-kafkaesque = {git = "https://github.com/TimelyDataflow/timely-dataflow" }
+kafkaesque = {git = "https://github.com/danalex97/timely-dataflow" }
 rdkafka = "0.14.0"
-timely = {git = "https://github.com/TimelyDataflow/timely-dataflow" }
+timely = {git = "https://github.com/danalex97/timely-dataflow" }
