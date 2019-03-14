@@ -1,7 +1,8 @@
 extern crate chrono;
 extern crate csv;
 
-use crate::Browser;
+use super::common::Browser;
+use super::common::Gender;
 
 use chrono::{NaiveDate, DateTime, FixedOffset};
 use csv::StringRecord;
@@ -18,12 +19,6 @@ pub struct Person {
     pub creation_date: DateTime<FixedOffset>,
     pub location_ip: std::net::Ipv4Addr,
     pub browser_used: Browser,
-}
-
-#[derive(Debug)]
-pub enum Gender {
-    MALE,
-    FEMALE,
 }
 
 impl Person {
@@ -48,19 +43,5 @@ impl Person {
             browser_used,
         })
 
-    }
-}
-
-impl FromStr for Gender {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq("male") {
-            return Ok(Gender::MALE);
-        }
-        if s.eq("female") {
-            return Ok(Gender::FEMALE);
-        }
-        return Err("Invalid gender specified");
     }
 }

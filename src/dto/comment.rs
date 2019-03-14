@@ -1,7 +1,8 @@
 extern crate chrono;
 extern crate csv;
 
-use super::util::maybe_record;
+use super::common::maybe_record;
+use super::common::Browser;
 
 use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
@@ -15,7 +16,7 @@ pub struct Comment {
     pub person_id: u32,
     pub creation_date: DateTime<FixedOffset>,
     pub location_ip: std::net::Ipv4Addr,
-    pub browser_used: String,
+    pub browser_used: Browser,
     pub content: String,
     pub reply_to_post_id: Option<u32>,
     pub reply_to_comment_id: Option<u32>,

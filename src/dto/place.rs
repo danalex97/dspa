@@ -1,5 +1,7 @@
 extern crate csv;
 
+use super::common::PlaceType;
+
 use csv::StringRecord;
 use std::error::Error;
 use std::str::FromStr;
@@ -26,29 +28,5 @@ impl Place {
             place_type,
         })
 
-    }
-}
-
-#[derive(Debug)]
-pub enum PlaceType {
-    CONTINENT,
-    COUNTRY,
-    CITY,
-}
-
-impl FromStr for PlaceType {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq("continent") {
-            return Ok(PlaceType::CONTINENT);
-        }
-        if s.eq("country") {
-            return Ok(PlaceType::COUNTRY);
-        }
-        if s.eq("city") {
-            return Ok(PlaceType::CITY);
-        }
-        return Err("Invalid place type specified");
     }
 }

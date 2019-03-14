@@ -1,22 +1,9 @@
-
-pub use crate::person::Person;
-pub use crate::place::Place;
-pub use crate::forum::Forum;
 use std::collections::HashMap;
 use std::str::FromStr;
 
-pub mod person;
-pub mod place;
-pub mod forum;
-
-#[derive(Debug)]
-pub enum Browser {
-    Chrome,
-    Firefox,
-    InternetExplorer,
-    Safari,
-}
-
+use dto::person::Person;
+use dto::place::Place;
+use dto::forum::Forum;
 
 pub fn parse_persons_csv(file: &str) -> HashMap<u32, Person> {
     let mut map = HashMap::new();
@@ -76,24 +63,4 @@ pub fn parse_forum_csv(file: &str) -> HashMap<u32, Forum> {
         }
     }
     map
-}
-
-impl FromStr for Browser {
-    type Err = &'static str;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.eq("Firefox") {
-            return Ok(Browser::Firefox);
-        }
-        if s.eq("Chrome") {
-            return Ok(Browser::Chrome);
-        }
-        if s.eq("Safari") {
-            return Ok(Browser::Safari);
-        }
-        if s.eq("Internet Explorer") {
-            return Ok(Browser::InternetExplorer);
-        }
-        Err("Unrecognised browser")
-    }
 }

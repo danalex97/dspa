@@ -1,8 +1,8 @@
 extern crate chrono;
 extern crate csv;
 
-use super::util::maybe_record;
-use super::util::parse_vector;
+use super::common::maybe_record;
+use super::common::parse_vector;
 
 use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
