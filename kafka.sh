@@ -16,6 +16,12 @@ function usage() {
 	printf "\t %- 30s %s\n" "-lt | --ltopic" "List topics."
 	printf "\t %- 30s %s\n" "-wt | --wtopic [topic]" "Write to topic."
     printf "\t %- 30s %s\n" "-rt | --rtopic [topic]" "Read from topic."
+
+    printf "\n"
+    printf "Examples:\n"
+    printf  "%- 40s %s\n" "echo \"some stuff\" | ./kafka.sh -wt hey" "Writes \"some stuff\" to topic 'hey'"
+    printf  "%- 40s %s\n" "./kafka.sh -rt hey" "Reads from topic 'hey'"
+    printf "\n"
 }
 
 function start_kafka() {
@@ -52,7 +58,7 @@ function list_topics() {
 }
 
 function write_topic() {
-	bin/kafka-console-producer.sh --broker-list localhost:9092 --topic $@
+    cat | bin/kafka-console-producer.sh --broker-list localhost:9092 --topic $@
 }
 
 function read_topic() {
