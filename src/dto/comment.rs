@@ -3,6 +3,7 @@ extern crate csv;
 
 use super::common::maybe_record;
 use super::common::Browser;
+use super::common::Importable;
 
 use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
@@ -23,8 +24,8 @@ pub struct Comment {
     pub place_id: u32,
 }
 
-impl Comment {
-    pub fn from_record(record: StringRecord) -> Result<Comment, Box<Error>> {
+impl Importable<Comment> for Comment {
+    fn from_record(record: StringRecord) -> Result<Comment, Box<Error>> {
         let id: u32 = record[0].parse()?;
         let person_id: u32 = record[1].parse()?;
         let creation_date = DateTime::parse_from_rfc3339(&record[2])?;
@@ -46,5 +47,9 @@ impl Comment {
             reply_to_comment_id,
             place_id,
         })
+    }
+
+    fn id(&self) -> Option<u32> {
+        Some(self.id)
     }
 }

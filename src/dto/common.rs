@@ -1,7 +1,15 @@
+extern crate csv;
+use csv::StringRecord;
+
 use std::str::FromStr;
 use std::vec::Vec;
 use std::option::Option;
 use std::error::Error;
+
+pub trait Importable<T> {
+    fn from_record(raw_record: StringRecord) -> Result<T, Box<Error>>;
+    fn id(&self) -> Option<u32>;
+}
 
 pub fn maybe_record<T>(raw_record: String) -> Result<Option<T>, Box<Error>> where
         T: FromStr,

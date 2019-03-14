@@ -1,5 +1,6 @@
 extern crate csv;
 
+use super::common::Importable;
 use super::common::PlaceType;
 
 use csv::StringRecord;
@@ -14,8 +15,8 @@ pub struct Place {
     pub place_type: PlaceType,
 }
 
-impl Place {
-    pub fn from_record(record: StringRecord) -> Result<Place, Box<Error>> {
+impl Importable<Place> for Place {
+    fn from_record(record: StringRecord) -> Result<Place, Box<Error>> {
         let id: u32 = record[0].parse()?;
         let name = record[1].parse()?;
         let url = record[2].parse()?;
@@ -27,6 +28,9 @@ impl Place {
             url,
             place_type,
         })
+    }
 
+    fn id(&self) -> Option<u32> {
+        Some(self.id)
     }
 }

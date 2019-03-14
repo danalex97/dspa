@@ -1,6 +1,7 @@
 extern crate chrono;
 extern crate csv;
 
+use super::common::Importable;
 use super::common::Browser;
 use super::common::Gender;
 
@@ -21,8 +22,8 @@ pub struct Person {
     pub browser_used: Browser,
 }
 
-impl Person {
-    pub fn from_record(record: StringRecord) -> Result<Person, Box<Error>> {
+impl Importable<Person> for Person {
+    fn from_record(record: StringRecord) -> Result<Person, Box<Error>> {
         let id: u32 = record[0].parse()?;
         let first_name = record[1].parse()?;
         let last_name = record[2].parse()?;
@@ -42,6 +43,9 @@ impl Person {
             location_ip,
             browser_used,
         })
+    }
 
+    fn id(&self) -> Option<u32> {
+        Some(self.id)
     }
 }

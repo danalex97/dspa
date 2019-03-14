@@ -1,9 +1,13 @@
 mod dto;
 mod stream;
+mod import;
 
 use dto::comment::Comment;
+use dto::person::Person;
+use dto::common::Importable;
 use csv::StringRecord;
 use stream::listen;
+use import::parse_csv;
 
 fn main() {
     let raw_record: &str      = "46228400|9106|2010-02-02T00:06:24Z|31.31.96.17|Firefox|About André Sá, Sá is a professional Brazilian. About Gustav Mahler, performance standards ensured his. About Thomas Aquinas, seminar method. It has school.||46228380|102";
@@ -13,4 +17,5 @@ fn main() {
     println!();
 
     listen();
+    parse_csv::<Person>("data/1k-users-sorted/tables/person.csv");
 }

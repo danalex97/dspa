@@ -1,6 +1,8 @@
 extern crate chrono;
 extern crate csv;
 
+use super::common::Importable;
+
 use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
 use std::error::Error;
@@ -12,8 +14,8 @@ pub struct Like {
     pub creation_date: DateTime<FixedOffset>,
 }
 
-impl Like {
-    pub fn from_record(record: StringRecord) -> Result<Like, Box<Error>> {
+impl Importable<Like> for Like {
+    fn from_record(record: StringRecord) -> Result<Like, Box<Error>> {
         let person_id = record[0].parse()?;
         let post_id = record[1].parse()?;
         let creation_date = DateTime::parse_from_rfc3339(&record[2])?;
@@ -23,5 +25,9 @@ impl Like {
             post_id,
             creation_date,
         })
+    }
+
+    fn id(&self) -> Option<u32> {
+        None
     }
 }

@@ -1,6 +1,7 @@
 extern crate chrono;
 extern crate csv;
 
+use super::common::Importable;
 use super::common::maybe_record;
 use super::common::parse_vector;
 
@@ -26,8 +27,8 @@ pub struct Post {
     pub place_id: u32,
 }
 
-impl Post {
-    pub fn from_record(record: StringRecord) -> Result<Post, Box<Error>> {
+impl Importable<Post> for Post {
+    fn from_record(record: StringRecord) -> Result<Post, Box<Error>> {
         let id: u32 = record[0].parse()?;
         let person_id: u32 = record[1].parse()?;
         let creation_date = DateTime::parse_from_rfc3339(&record[2])?;
@@ -53,5 +54,9 @@ impl Post {
             forum_id,
             place_id,
         })
+    }
+
+    fn id(&self) -> Option<u32> {
+        Some(self.id)
     }
 }
