@@ -1,11 +1,10 @@
 extern crate csv;
 
-use super::common::Importable;
-use super::common::PlaceType;
+use crate::dto::common::Importable;
+use crate::dto::common::PlaceType;
 
 use csv::StringRecord;
 use std::error::Error;
-use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Place {

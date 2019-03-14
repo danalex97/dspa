@@ -1,14 +1,13 @@
 extern crate chrono;
 extern crate csv;
 
-use super::common::Importable;
-use super::common::Browser;
-use super::common::Gender;
+use crate::dto::common::Importable;
+use crate::dto::common::Browser;
+use crate::dto::common::Gender;
 
 use chrono::{NaiveDate, DateTime, FixedOffset};
 use csv::StringRecord;
 use std::error::Error;
-use std::str::FromStr;
 
 #[derive(Debug)]
 pub struct Person {

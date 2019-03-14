@@ -1,7 +1,5 @@
 use std::collections::HashMap;
-use std::str::FromStr;
-
-use super::dto::common::Importable;
+use crate::dto::common::Importable;
 
 pub fn parse_csv<T>(file: &str) -> HashMap<u32, T> where
         T: Importable<T>,

@@ -9,12 +9,12 @@ function usage() {
 	echo "Kafka utilities."
 
     echo -e "\nOptions: "
-	printf "\t %- 30s %s\n" "-s | --start" "Start Zookeper and Kafka."
-	printf "\t %- 30s %s\n" "-k | --kill" "Stops all Zookeper and Kafka processes."
-	printf "\t %- 30s %s\n" "-t | --topic [topic]" "Create topic."
-	printf "\t %- 30s %s\n" "-dt | --dtopic [topic]" "Delete topic."
-	printf "\t %- 30s %s\n" "-lt | --ltopic" "List topics."
-	printf "\t %- 30s %s\n" "-wt | --wtopic [topic]" "Write to topic."
+    printf "\t %- 30s %s\n" "-s | --start" "Start Zookeper and Kafka."
+    printf "\t %- 30s %s\n" "-k | --kill" "Stops all Zookeper and Kafka processes."
+    printf "\t %- 30s %s\n" "-t | --topic [topic]" "Create topic."
+    printf "\t %- 30s %s\n" "-dt | --dtopic [topic]" "Delete topic."
+    printf "\t %- 30s %s\n" "-lt | --ltopic" "List topics."
+    printf "\t %- 30s %s\n" "-wt | --wtopic [topic]" "Write to topic."
     printf "\t %- 30s %s\n" "-rt | --rtopic [topic]" "Read from topic."
 
     printf "\n"
@@ -25,36 +25,36 @@ function usage() {
 }
 
 function start_kafka() {
-	echo "Starting processes..."
-	nohup bin/zookeeper-server-start.sh config/zookeeper.properties >/dev/null 2>&1 &
-	nohup bin/kafka-server-start.sh config/server.properties >/dev/null 2>&1 &
-	nohup bin/kafka-server-start.sh config/server-1.properties >/dev/null 2>&1 &
-	nohup bin/kafka-server-start.sh config/server-2.properties >/dev/null 2>&1 &
-	echo "Processes started."
+    echo "Starting processes..."
+    nohup bin/zookeeper-server-start.sh config/zookeeper.properties >/dev/null 2>&1 &
+    nohup bin/kafka-server-start.sh config/server.properties >/dev/null 2>&1 &
+    nohup bin/kafka-server-start.sh config/server-1.properties >/dev/null 2>&1 &
+    nohup bin/kafka-server-start.sh config/server-2.properties >/dev/null 2>&1 &
+    echo "Processes started."
 }
 
 function kill_process() {
-	pids=$(ps -ax | grep $1 | grep -v 'grep' | awk '{print $1}')
+    pids=$(ps -ax | grep $1 | grep -v 'grep' | awk '{print $1}')
 
-	for pid in $pids
-	do
-		if [ $pid != $$ ]; then
-			echo "Killing $1 $pid"
-			kill -9 $pid 2>1 || true
-		fi
-	done
+    for pid in $pids
+    do
+        if [ $pid != $$ ]; then
+            echo "Killing $1 $pid"
+            kill -9 $pid 2>1 || true
+        fi
+    done
 }
 
 function delete_topic() {
-	bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic $1
+    bin/kafka-topics.sh --zookeeper localhost:2181 --delete --topic $1
 }
 
 function make_topic() {
-	bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic $1
+    bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic $1
 }
 
 function list_topics() {
-	bin/kafka-topics.sh --list --zookeeper localhost:2181
+    bin/kafka-topics.sh --list --zookeeper localhost:2181
 }
 
 function write_topic() {
@@ -62,54 +62,54 @@ function write_topic() {
 }
 
 function read_topic() {
-	bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic $@
+    bin/kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic $@
 }
 
 function stop_all() {
-	echo "Stoping all..."
-	kill_process "zookeeper"
-	kill_process "kafka"
-	echo "All processes killed."
+    echo "Stoping all..."
+    kill_process "zookeeper"
+    kill_process "kafka"
+    echo "All processes killed."
 }
 
 function parse_command_line_options() {
     while [ "${1:-}" != "" ]; do
         case $1 in
             -s | --start)
-				shift
-				start_kafka
-				exit 0
+                shift
+                start_kafka
+                exit 0
                 ;;
-			-k | --kill)
-				shift
-				stop_all
-				exit 0
+            -k | --kill)
+                shift
+                stop_all
+                exit 0
                 ;;
-			-t | --topic)
-				shift
-				make_topic $1
-				exit 0
+            -t | --topic)
+                shift
+                make_topic $1
+                exit 0
                 ;;
-			-lt | --ltopic)
-				shift
-				list_topics
-				exit 0
+            -lt | --ltopic)
+                shift
+                list_topics
+                exit 0
                 ;;
-			-dt | --dtopic)
-				shift
-				delete_topic $1
-				exit 0
-				;;
-			-wt | --wtopic)
-				shift
-				write_topic $@
-				exit 0
-				;;
-			-rt | --rtopic)
-				shift
-				read_topic $@
-				exit 0
-				;;
+            -dt | --dtopic)
+                shift
+                delete_topic $1
+                exit 0
+                ;;
+            -wt | --wtopic)
+                shift
+                write_topic $@
+                exit 0
+                ;;
+            -rt | --rtopic)
+                shift
+                read_topic $@
+                exit 0
+                ;;
             -h | --help )
                 usage
                 exit 0
@@ -124,8 +124,8 @@ function parse_command_line_options() {
 }
 
 if [[ ! -v KAFKA_DIR ]]; then
-	echo "Please setup KAFKA_DIR environment variable."
-	exit 0
+    echo "Please setup KAFKA_DIR environment variable."
+    exit 0
 fi
 
 pushd $KAFKA_DIR > /dev/null

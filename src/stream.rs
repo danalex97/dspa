@@ -1,11 +1,11 @@
 extern crate timely;
+extern crate rdkafka;
+extern crate kafkaesque;
+
 use timely::dataflow::operators::Inspect;
 
-extern crate rdkafka;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, BaseConsumer, EmptyConsumerContext};
-
-extern crate kafkaesque;
 
 pub fn listen() {
     let mut args = ::std::env::args();
