@@ -1,6 +1,9 @@
+extern crate chrono;
 extern crate csv;
 
 use crate::Browser;
+
+use chrono::{NaiveDate, DateTime, FixedOffset};
 use csv::StringRecord;
 use std::error::Error;
 use std::str::FromStr;
@@ -11,8 +14,8 @@ pub struct Person {
     pub first_name: String,
     pub last_name: String,
     pub gender: Gender,
-    pub birthday: String,
-    pub creation_date: String,
+    pub birthday: NaiveDate,
+    pub creation_date: DateTime<FixedOffset>,
     pub location_ip: std::net::Ipv4Addr,
     pub browser_used: Browser,
 }
@@ -29,8 +32,8 @@ impl Person {
         let first_name = record[1].parse()?;
         let last_name = record[2].parse()?;
         let gender = record[3].parse()?;
-        let birthday = record[4].parse()?;
-        let creation_date = record[5].parse()?;
+        let birthday = NaiveDate::parse_from_str(&record[4], "%Y-%m-%d")?;
+        let creation_date = DateTime::parse_from_rfc3339(&record[5])?;
         let location_ip = record[6].parse()?;
         let browser_used = record[7].parse()?;
 
