@@ -1,11 +1,13 @@
 
 pub use crate::person::Person;
 pub use crate::place::Place;
+pub use crate::forum::Forum;
 use std::collections::HashMap;
 use std::str::FromStr;
 
 pub mod person;
 pub mod place;
+pub mod forum;
 
 #[derive(Debug)]
 pub enum Browser {
@@ -48,6 +50,26 @@ pub fn parse_place_csv(file: &str) -> HashMap<u32, Place> {
                     map.insert(place.id, place);
                 } else {
                     eprintln!("Error: {:?}", p);
+                }
+            },
+            Err(e) => eprintln!("Error: {:?}", e)
+        }
+    }
+    map
+}
+
+pub fn parse_forum_csv(file: &str) -> HashMap<u32, Forum> {
+    let mut map = HashMap::new();
+    let mut rdr = csv::ReaderBuilder::new().delimiter(b'|').from_path(file).unwrap();
+    for record in rdr.records() {
+        match record {
+            Ok(r) => {
+                let f = Forum::from_record(r);
+                if f.is_ok() {
+                    let forum = f.unwrap();
+                    map.insert(forum.id, forum);
+                } else {
+                    eprintln!("Error: {:?}", f);
                 }
             },
             Err(e) => eprintln!("Error: {:?}", e)
