@@ -1,17 +1,18 @@
 extern crate chrono;
 extern crate csv;
 
+use super::util::maybe_record;
+
 use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
-use std::error::Error;
-use std::str::FromStr;
 
+use std::error::Error;
 use std::option::Option;
 
 #[derive(Debug)]
 pub struct Comment {
     pub id: u32,
-    pub person_id: String,
+    pub person_id: u32,
     pub creation_date: DateTime<FixedOffset>,
     pub location_ip: std::net::Ipv4Addr,
     pub browser_used: String,
@@ -21,20 +22,10 @@ pub struct Comment {
     pub place_id: u32,
 }
 
-fn maybe_record<T>(raw_record: String) -> Option<T> where
-        T: FromStr,
-        <T as std::str::FromStr>::Err: std::fmt::Debug, {
-    if raw_record.is_empty() {
-        None
-    } else {
-        Some(raw_record.parse::<T>().unwrap())
-    }
-}
-
 impl Comment {
     pub fn from_record(record: StringRecord) -> Result<Comment, Box<Error>> {
         let id: u32 = record[0].parse()?;
-        let person_id = record[1].parse()?;
+        let person_id: u32 = record[1].parse()?;
         let creation_date = DateTime::parse_from_rfc3339(&record[2])?;
         let location_ip = record[3].parse()?;
         let browser_used = record[4].parse()?;
