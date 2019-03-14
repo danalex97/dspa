@@ -2,6 +2,7 @@ extern crate chrono;
 extern crate csv;
 
 use super::util::maybe_record;
+use super::util::parse_vector;
 
 use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
@@ -9,10 +10,6 @@ use csv::StringRecord;
 use std::error::Error;
 use std::option::Option;
 use std::vec::Vec;
-
-// id|personId|creationDate|imageFile|locationIP|browserUsed|language|content|tags|forumId|placeId
-// 270250|122|2012-02-02T02:46:56Z||204.79.194.17|Firefox|en|About Vladimir Lenin, of Marxism that emphasized the critical role played. About Kurt Weill, Weill (March 2, 1900 � April 3, 1950) was a.|[7001, 1667]|2440|28
-// 1
 
 #[derive(Debug)]
 pub struct Post {
@@ -34,12 +31,12 @@ impl Post {
         let id: u32 = record[0].parse()?;
         let person_id: u32 = record[1].parse()?;
         let creation_date = DateTime::parse_from_rfc3339(&record[2])?;
-        let image_file = maybe_record::<String>(record[3].parse()?);
+        let image_file = maybe_record::<String>(record[3].parse()?)?;
         let location_ip = record[4].parse()?;
         let browser_used = record[5].parse()?;
         let language = record[6].parse()?;
         let content = record[7].parse()?;
-        let tags = vec![];
+        let tags = parse_vector::<u32>(record[8].parse()?)?;
         let forum_id = record[9].parse()?;
         let place_id = record[10].parse()?;
 

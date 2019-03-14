@@ -30,8 +30,8 @@ impl Comment {
         let location_ip = record[3].parse()?;
         let browser_used = record[4].parse()?;
         let content = record[5].parse()?;
-        let reply_to_post_id = maybe_record::<u32>(record[6].parse()?);
-        let reply_to_comment_id = maybe_record::<u32>(record[7].parse()?);
+        let reply_to_post_id = maybe_record::<u32>(record[6].parse()?)?;
+        let reply_to_comment_id = maybe_record::<u32>(record[7].parse()?)?;
         let place_id = record[8].parse()?;
 
         Ok(Comment{
