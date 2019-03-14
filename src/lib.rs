@@ -1,9 +1,11 @@
 
 pub use crate::person::Person;
+pub use crate::place::Place;
 use std::collections::HashMap;
 use std::str::FromStr;
 
 pub mod person;
+pub mod place;
 
 #[derive(Debug)]
 pub enum Browser {
@@ -24,6 +26,26 @@ pub fn parse_persons_csv(file: &str) -> HashMap<u32, Person> {
                 if p.is_ok() {
                     let person = p.unwrap();
                     map.insert(person.id, person);
+                } else {
+                    eprintln!("Error: {:?}", p);
+                }
+            },
+            Err(e) => eprintln!("Error: {:?}", e)
+        }
+    }
+    map
+}
+
+pub fn parse_place_csv(file: &str) -> HashMap<u32, Place> {
+    let mut map = HashMap::new();
+    let mut rdr = csv::ReaderBuilder::new().delimiter(b'|').from_path(file).unwrap();
+    for record in rdr.records() {
+        match record {
+            Ok(r) => {
+                let p = Place::from_record(r);
+                if p.is_ok() {
+                    let place = p.unwrap();
+                    map.insert(place.id, place);
                 } else {
                     eprintln!("Error: {:?}", p);
                 }
