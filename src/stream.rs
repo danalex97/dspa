@@ -7,12 +7,11 @@ use timely::dataflow::operators::Inspect;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, BaseConsumer, EmptyConsumerContext};
 
-pub fn listen() {
+pub fn listen(topic: String) {
     let mut args = ::std::env::args();
     args.next();
 
     // Extract Kafka topic.
-    let topic = "comments";
     let brokers = "localhost:9092";
 
     // Create Kafka consumer configuration.

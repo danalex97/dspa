@@ -32,6 +32,7 @@ pub enum Browser {
     Chrome,
     Firefox,
     InternetExplorer,
+    Opera,
     Safari,
 }
 
@@ -48,9 +49,13 @@ impl FromStr for Browser {
         if s.eq("Safari") {
             return Ok(Browser::Safari);
         }
+        if s.eq("Opera") {
+            return Ok(Browser::Opera);
+        }
         if s.eq("Internet Explorer") {
             return Ok(Browser::InternetExplorer);
         }
+        println!("{:?}", s);
         Err("Unrecognised browser")
     }
 }

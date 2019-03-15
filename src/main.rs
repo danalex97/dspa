@@ -1,24 +1,17 @@
 mod dto;
+mod connection;
 mod stream;
-mod import;
-mod producer;
 
-use dto::comment::Comment;
 use dto::person::Person;
-use dto::common::Importable;
-use csv::StringRecord;
+
 use stream::listen;
-use import::parse_csv;
-use producer::producer;
+use connection::import::parse_csv;
+use connection::producer::Producer;
 
 fn main() {
-    let raw_record: &str      = "46228400|9106|2010-02-02T00:06:24Z|31.31.96.17|Firefox|About André Sá, Sá is a professional Brazilian. About Gustav Mahler, performance standards ensured his. About Thomas Aquinas, seminar method. It has school.||46228380|102";
-    let vec_record: Vec<&str> = raw_record.split('|').collect();
-    let c = Comment::from_record(StringRecord::from(vec_record));
-    println!("{:?}", c);
-    println!();
-
-    producer();
-    listen();
-    parse_csv::<Person>("data/1k-users-sorted/tables/person.csv");
+    let mut producer = Producer::new("person".to_string());
+    parse_csv::<Person, _>("data/1k-users-sorted/tables/person.csv", |person| {
+        producer.write(format!("{:?}", person));
+    });
+    listen("person".to_string());
 }
