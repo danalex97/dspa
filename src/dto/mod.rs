@@ -1,9 +1,8 @@
-pub mod common;
-
 pub mod comment;
-pub mod like;
-pub mod post;
-
+pub mod common;
 pub mod forum;
+pub mod like;
+pub mod parse;
 pub mod person;
 pub mod place;
+pub mod post;
