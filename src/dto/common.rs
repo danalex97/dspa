@@ -24,7 +24,17 @@ pub fn maybe_record<T>(raw_record: String) -> Result<Option<T>, Box<Error>> wher
 pub fn parse_vector<T>(raw_vector: String) -> Result<Vec<T>, Box<Error>> where
         T: FromStr,
         <T as std::str::FromStr>::Err: std::fmt::Debug, {
-    Ok(raw_vector.trim().replace("[", "").split(",").map(|x| x.parse::<T>().unwrap()).collect())
+    if raw_vector.is_empty() {
+        return Ok(Vec::new())
+    }
+
+    Ok(raw_vector.trim()
+                 .replace("[", "")
+                 .replace("]", "")
+                 .split(", ")
+                 .map(|x| {x.parse::<T>().unwrap()})
+                 .collect()
+    )
 }
 
 #[derive(Debug)]
