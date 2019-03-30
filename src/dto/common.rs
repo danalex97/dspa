@@ -3,7 +3,6 @@ use csv::StringRecord;
 
 use std::str::FromStr;
 use std::vec::Vec;
-use std::option::Option;
 use std::error::Error;
 
 pub trait Importable<T> {

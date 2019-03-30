@@ -9,5 +9,6 @@ chrono = "0.4"
 csv = "1"
 futures = "0.1"
 kafkaesque = {git = "https://github.com/danalex97/timely-dataflow" }
+rand = "0.6"
 rdkafka = "0.14.0"
 timely = {git = "https://github.com/danalex97/timely-dataflow" }

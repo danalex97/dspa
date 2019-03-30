@@ -9,7 +9,6 @@ use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
 
 use std::error::Error;
-use std::option::Option;
 use std::vec::Vec;
 
 #[derive(Debug)]
