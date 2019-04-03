@@ -58,6 +58,12 @@ impl Producer {
                         0
                     );
                     self.key += 1;
+                    cnt += 1;
+                    if let Some(lines) = lines {
+                        if cnt == lines {
+                            return cnt;
+                        }
+                    }
                 }
                 epoch_start_time = creation_time;
                 buffer = BinaryHeap::new();
@@ -65,17 +71,8 @@ impl Producer {
             let offset = Duration::seconds(rand::thread_rng().gen_range(1, FIXED_BOUNDED_DELAY) as i64);
             let insertion_time = creation_time + offset;
             buffer.push((insertion_time.timestamp(), line));
-
-            cnt += 1;
-            // option to read only the first lines of the file
-            if let Some(lines) = lines {
-                if cnt == lines {
-                    break;
-                }
-            }
         }
 
-        // For the last ones
         for (time, data) in buffer.into_sorted_vec() {
             self.producer.send_copy(
                 &self.topic,
@@ -86,6 +83,12 @@ impl Producer {
                 0
             );
             self.key += 1;
+            cnt += 1;
+            if let Some(lines) = lines {
+                if cnt == lines {
+                    return cnt;
+                }
+            }
         }
 
         cnt
