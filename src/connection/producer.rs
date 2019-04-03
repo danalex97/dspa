@@ -2,7 +2,6 @@ extern crate futures;
 extern crate rand;
 extern crate rdkafka;
 
-use futures::*;
 
 use rand::Rng;
 use rdkafka::client::EmptyContext;
@@ -37,13 +36,14 @@ impl Producer {
         }
     }
 
-    pub fn write_file(&mut self, file_name: &str) {
+    pub fn write_file(&mut self, file_name: &str, lines: Option<usize>) -> usize {
         let f = File::open(file_name).unwrap();
         let f = BufReader::new(f);
 
         let mut epoch_start_time = FixedOffset::east(0).ymd(2000, 1, 1).and_hms_milli(12, 0, 0, 0);
         let mut buffer: BinaryHeap<(i64, String)> = BinaryHeap::new();
 
+        let mut cnt = 0;
         for line in f.lines().skip(1) {
             let line = line.unwrap();
             let fields: Vec<&str> = line.split("|").collect();
@@ -66,6 +66,14 @@ impl Producer {
             let offset = Duration::seconds(rand::thread_rng().gen_range(1, FIXED_BOUNDED_DELAY) as i64);
             let insertion_time = creation_time + offset;
             buffer.push((insertion_time.timestamp(), line));
+
+            cnt += 1;
+            // option to read only the first lines of the file
+            if let Some(lines) = lines {
+                if (cnt == lines) {
+                    break;
+                }
+            }
         }
 
         // For the last ones
@@ -80,5 +88,7 @@ impl Producer {
             );
             self.key += 1;
         }
+
+        cnt
     }
 }

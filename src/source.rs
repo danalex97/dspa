@@ -5,7 +5,6 @@ extern crate csv;
 
 use crate::dto::common::{Importable, Timestamped};
 
-use timely::dataflow::operators::Inspect;
 use timely::dataflow::scopes::Scope;
 use timely::dataflow::Stream;
 use timely::Data;
@@ -13,9 +12,6 @@ use timely::Data;
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, BaseConsumer, EmptyConsumerContext};
 use csv::StringRecord;
-
-use chrono::{DateTime, FixedOffset};
-use chrono::offset::TimeZone;
 
 const FIXED_BOUNDED_DELAY: usize = 500; //seconds
 
@@ -52,7 +48,7 @@ impl<G: Scope<Timestamp=usize>> KafkaSource<G> for G {
 
                 match D::from_record(record) {
                     Ok(record) => {
-                        let mut capability_time = *capability.time();
+                        let capability_time = *capability.time();
                         let candidate_time = record.timestamp() - FIXED_BOUNDED_DELAY;
 
                         // I have a tighter bound for downgrading the capability
