@@ -22,7 +22,7 @@ fn stash<T>(container : &mut HashMap<usize, Vec<T>>, time : usize, value : T) {
         .push(value);
 }
 
-fn drain<T>(container : &mut HashMap<usize, Vec<T>>, t1 : usize, t2 : usize) -> Vec<T> {
+fn drain_period<T>(container : &mut HashMap<usize, Vec<T>>, t1 : usize, t2 : usize) -> Vec<T> {
     let mut all = Vec::new();
     for t in t1..t2 {
         container
@@ -38,20 +38,22 @@ pub fn run() {
             let mut comments_buffer: HashMap<usize, Vec<Comment>> = HashMap::new();
             let mut posts_buffer: HashMap<usize, Vec<Post>> = HashMap::new();
 
-            // produces a list of all the new posts together with the timestamp of the
-            // segment that needs to be processed
-            let grouped_posts = scope
-                .kafka_string_source::<Post>("posts".to_string())
-                .unary_notify(Pipeline, "CollectPosts", None, move |input, output, notificator| {
+            let posts = scope.kafka_string_source::<Post>("posts".to_string());
+            let comments = scope.kafka_string_source::<Comment>("comments".to_string());
+
+            posts
+                .binary_notify(&comments, Pipeline, Pipeline, "CollectComments", None,
+                    move |p_input, c_input, output, notificator| {
                     // note that we know that the timestamp of the first event should be from
                     // a post, since we can't recive likes or comments without any post
                     let mut scheduled = false;
                     let mut first = true;
-                    let mut vector = Vec::new();
+                    let mut p_vector = Vec::new();
 
-                    input.for_each(|cap, posts| {
-                        posts.swap(&mut vector);
-                        for post in vector.drain(..) {
+                    p_input.for_each(|cap, posts| {
+                        posts.swap(&mut p_vector);
+                        for post in p_vector.drain(..) {
+                            // buffer posts
                             let time = post.timestamp().clone();
                             stash(&mut posts_buffer, post.timestamp(), post);
 
@@ -60,6 +62,15 @@ pub fn run() {
                                 scheduled = true;
                                 notificator.notify_at(cap.delayed(&(time + MAX_DELAY)));
                             }
+                        }
+                    });
+
+                    let mut c_vector = Vec::new();
+                    c_input.for_each(|cap, comments| {
+                        // buffer comments
+                        comments.swap(&mut c_vector);
+                        for comment in c_vector.drain(..) {
+                            stash(&mut comments_buffer, comment.timestamp(), comment);
                         }
                     });
 
@@ -80,52 +91,31 @@ pub fn run() {
                         } else {
                             // get all newly created posts in last 30 minutes window
                             let mut session = output.session(&cap);
-                            session.give((time, drain(
+
+                            // process all posts
+                            for post in drain_period(
                                 &mut posts_buffer, time - COLLECTION_PERIOD, time
-                            )));
+                            ).drain(..) {
+                                // [TODO]: process posts
+                                println!("{:?}", post);
+                            }
+
+                            // process all comments
+                            for comment in drain_period(
+                                &mut comments_buffer, time - COLLECTION_PERIOD, time
+                            ).drain(..) {
+                                // [TODO]: process comments
+                                println!("{:?}", comment);
+                            }
+
+                            // [TODO]: simplify version
+                            session.give(1);
 
                             // schedule next periodic notification
                             notificator.notify_at(cap.delayed(&(time + COLLECTION_PERIOD)));
                         }
                     });
-                }).inspect(|x| println!("{:?}", x));
-
-            let grouped_commments = scope.kafka_string_source::<Comment>("comments".to_string())
-                .binary_notify(&grouped_posts, Pipeline, Pipeline, "CollectComments", None,
-                        move |c_input, p_input, output, notificator| {
-                    let mut vector = Vec::new();
-                    p_input.for_each(|cap, grouped_posts| {
-                        grouped_posts.swap(&mut vector);
-                        for (time, group) in vector.drain(..) {
-                            // process each group of posts
-                            for post in group.iter() {
-                                // TODO: [...]
-                            }
-
-                            // schedule a notification at the received time
-                            notificator.notify_at(cap.delayed(&time));
-                        }
-                    });
-
-                    let mut c_vector = Vec::new();
-                    c_input.for_each(|cap, comments| {
-                        // buffer comments
-                        comments.swap(&mut c_vector);
-                        for comment in c_vector.drain(..) {
-                            stash(&mut comments_buffer, comment.timestamp(), comment);
-                        }
-                    });
-
-                    notificator.for_each(|cap, _, notificator| {
-                        let time = cap.time().clone();
-                        let mut session = output.session(&cap);
-
-                        // output all relevant comments
-                        session.give((time, drain(
-                            &mut comments_buffer, time - COLLECTION_PERIOD, time
-                        )));
-                    });
-                }).inspect(|x| println!("{:?}", x));
+                });
         });
     }).unwrap();
 }
