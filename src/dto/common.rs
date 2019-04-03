@@ -10,9 +10,7 @@ pub trait Importable<T> {
     fn id(&self) -> Option<u32>;
 }
 
-pub fn maybe_record<T>(raw_record: &str) -> Option<T> where
-        T: FromStr,
-        <T as std::str::FromStr>::Err: std::fmt::Debug, {
+pub fn maybe_record<T : FromStr>(raw_record: &str) -> Option<T> {
     let parsed = raw_record.parse::<T>();
     match parsed {
         Ok(r) => Some(r),

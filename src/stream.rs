@@ -1,6 +1,7 @@
 extern crate timely;
 extern crate rdkafka;
 extern crate kafkaesque;
+extern crate csv;
 
 use timely::dataflow::operators::Inspect;
 use timely::dataflow::scopes::Scope;
@@ -9,13 +10,15 @@ use timely::Data;
 
 use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, BaseConsumer, EmptyConsumerContext};
+use crate::dto::common::Importable;
+use csv::StringRecord;
 
-trait KafkaSource<G: Scope> {
-    fn kafka_string_source(&self, topic : String) -> Stream<G, String>;
+trait KafkaSource<G: Scope, D : Importable<D> + Data > {
+    fn kafka_string_source(&self, topic : String) -> Stream<G, D>;
 }
 
-impl<G: Scope<Timestamp=usize>> KafkaSource<G> for G {
-    fn kafka_string_source(&self, topic : String) -> Stream<G, String> {
+impl<G: Scope<Timestamp=usize>, D : Importable<D> + Data > KafkaSource<G, D> for G {
+    fn kafka_string_source(&self, topic : String) -> Stream<G, D> {
         // Extract Kafka topic.
         let brokers = "localhost:9092";
 
@@ -40,9 +43,15 @@ impl<G: Scope<Timestamp=usize>> KafkaSource<G> for G {
 
             // If the bytes are utf8, convert to string and send.
             if let Ok(text) = std::str::from_utf8(bytes) {
-                output
-                    .session(capability)
-                    .give(text.to_string());
+                let v: Vec<&str> = text.split("|").collect();
+                let record = StringRecord::from(v);
+
+                match D::from_record(record) {
+                    Ok(r) => output
+                        .session(capability)
+                        .give(r),
+                    Err(_) => {}
+                }
             }
 
             // We need some rule to advance timestamps ...
