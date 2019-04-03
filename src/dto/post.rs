@@ -11,7 +11,7 @@ use csv::StringRecord;
 use std::error::Error;
 use std::vec::Vec;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Post {
     pub id: u32,
     pub person_id: u32,

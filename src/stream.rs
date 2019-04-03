@@ -13,12 +13,12 @@ use rdkafka::consumer::{Consumer, BaseConsumer, EmptyConsumerContext};
 use crate::dto::common::Importable;
 use csv::StringRecord;
 
-trait KafkaSource<G: Scope, D : Importable<D> + Data > {
-    fn kafka_string_source(&self, topic : String) -> Stream<G, D>;
+pub trait KafkaSource<G: Scope> {
+    fn kafka_string_source<D : Importable<D> + Data>(&self, topic : String) -> Stream<G, D>;
 }
 
-impl<G: Scope<Timestamp=usize>, D : Importable<D> + Data > KafkaSource<G, D> for G {
-    fn kafka_string_source(&self, topic : String) -> Stream<G, D> {
+impl<G: Scope<Timestamp=usize>> KafkaSource<G> for G {
+    fn kafka_string_source<D : Importable<D> + Data>(&self, topic : String) -> Stream<G, D> {
         // Extract Kafka topic.
         let brokers = "localhost:9092";
 
