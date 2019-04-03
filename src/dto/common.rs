@@ -10,6 +10,10 @@ pub trait Importable<T> {
     fn id(&self) -> Option<u32>;
 }
 
+pub trait Timestamped {
+    fn timestamp(&self) -> usize;
+}
+
 pub fn maybe_record<T : FromStr>(raw_record: &str) -> Option<T> {
     let parsed = raw_record.parse::<T>();
     match parsed {

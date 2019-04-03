@@ -1,7 +1,7 @@
 extern crate chrono;
 extern crate csv;
 
-use crate::dto::common::Importable;
+use crate::dto::common::{Importable, Timestamped};
 
 use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
@@ -29,5 +29,11 @@ impl Importable<Like> for Like {
 
     fn id(&self) -> Option<u32> {
         None
+    }
+}
+
+impl Timestamped for Like {
+    fn timestamp(&self) -> usize {
+        return self.creation_date.timestamp() as usize;
     }
 }

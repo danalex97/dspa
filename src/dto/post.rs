@@ -1,7 +1,7 @@
 extern crate chrono;
 extern crate csv;
 
-use crate::dto::common::Importable;
+use crate::dto::common::{Importable, Timestamped};
 use crate::dto::common::maybe_record;
 use crate::dto::common::parse_vector;
 
@@ -57,5 +57,11 @@ impl Importable<Post> for Post {
 
     fn id(&self) -> Option<u32> {
         Some(self.id)
+    }
+}
+
+impl Timestamped for Post {
+    fn timestamp(&self) -> usize {
+        return self.creation_date.timestamp() as usize;
     }
 }

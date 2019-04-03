@@ -3,14 +3,12 @@ extern crate rand;
 extern crate rdkafka;
 
 use futures::*;
-use std::option;
 
 use rand::Rng;
 use rdkafka::client::EmptyContext;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::FutureProducer;
-use self::rdkafka::message::ToBytes;
-use chrono::{DateTime, FixedOffset, Duration, Utc};
+use chrono::{DateTime, FixedOffset, Duration};
 use std::fs::File;
 use std::io::{BufReader, BufRead};
 use std::collections::BinaryHeap;
