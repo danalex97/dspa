@@ -10,17 +10,17 @@ pub trait Importable<T> {
     fn id(&self) -> Option<u32>;
 }
 
-pub fn maybe_record<T>(raw_record: String) -> Result<Option<T>, Box<Error>> where
+pub fn maybe_record<T>(raw_record: &str) -> Option<T> where
         T: FromStr,
         <T as std::str::FromStr>::Err: std::fmt::Debug, {
-    if raw_record.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(raw_record.parse::<T>().unwrap()))
+    let parsed = raw_record.parse::<T>();
+    match parsed {
+        Ok(r) => Some(r),
+        Err(_) => None
     }
 }
 
-pub fn parse_vector<T>(raw_vector: String) -> Result<Vec<T>, Box<Error>> where
+pub fn parse_vector<T>(raw_vector: &str) -> Result<Vec<T>, Box<Error>> where
         T: FromStr,
         <T as std::str::FromStr>::Err: std::fmt::Debug, {
     if raw_vector.is_empty() {

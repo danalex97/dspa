@@ -31,12 +31,12 @@ impl Importable<Post> for Post {
         let id: u32 = record[0].parse()?;
         let person_id: u32 = record[1].parse()?;
         let creation_date = DateTime::parse_from_rfc3339(&record[2])?;
-        let image_file = maybe_record::<String>(record[3].parse()?)?;
+        let image_file = maybe_record::<String>(&record[3]);
         let location_ip = record[4].parse()?;
         let browser_used = record[5].parse()?;
         let language = record[6].parse()?;
         let content = record[7].parse()?;
-        let tags = parse_vector::<u32>(record[8].parse()?)?;
+        let tags = parse_vector::<u32>(&record[8])?;
         let forum_id = record[9].parse()?;
         let place_id = record[10].parse()?;
 
