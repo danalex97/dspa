@@ -11,7 +11,7 @@ use csv::StringRecord;
 use std::error::Error;
 use std::option::Option;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Comment {
     pub id: u32,
     pub person_id: u32,

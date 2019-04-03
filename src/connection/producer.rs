@@ -69,7 +69,7 @@ impl Producer {
             cnt += 1;
             // option to read only the first lines of the file
             if let Some(lines) = lines {
-                if (cnt == lines) {
+                if cnt == lines {
                     break;
                 }
             }
