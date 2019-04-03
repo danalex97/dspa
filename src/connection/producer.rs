@@ -2,7 +2,6 @@ extern crate futures;
 extern crate rand;
 extern crate rdkafka;
 
-
 use rand::Rng;
 use rdkafka::client::EmptyContext;
 use rdkafka::config::ClientConfig;

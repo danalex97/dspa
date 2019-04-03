@@ -1,20 +1,14 @@
 #[macro_use]
 extern crate clap;
-extern crate timely;
 
 mod dto;
-mod source;
+mod tasks;
 mod connection;
+mod operators;
 
-use dto::post::Post;
-use source::KafkaSource;
-use connection::producer::Producer;
-
-use timely::dataflow::operators::Inspect;
-
+use tasks::load;
+use tasks::post_stats;
 use clap::{App, SubCommand, Arg};
-
-static POSTS_PATH: &'static str = "data/1k-users-sorted/streams/post_event_stream.csv";
 
 fn main() {
     let matches = App::new("DSPA")
@@ -30,21 +24,15 @@ fn main() {
        .get_matches();
 
     if let ("load", Some(args)) = matches.subcommand() {
-        let mut producer = Producer::new("posts".to_string());
         let records = match value_t!(args.value_of("records"), usize) {
             Ok(records) => Some(records),
             Err(_) => None,
         };
 
-        let loaded = producer.write_file(POSTS_PATH, records);
-        println!("{} records loaded to Kafka.", loaded);
+        load::run(records);
     }
 
     if let ("post-stats", _) = matches.subcommand() {
-        timely::execute_from_args(std::env::args(), |worker| {
-            worker.dataflow::<usize, _, _>(|scope| {
-                scope.kafka_string_source::<Post>("posts".to_string());
-            });
-        }).unwrap();
+        post_stats::run();
     }
 }
