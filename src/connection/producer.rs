@@ -12,7 +12,7 @@ use std::io::{BufReader, BufRead};
 use std::collections::BinaryHeap;
 use chrono::offset::TimeZone;
 
-const FIXED_BOUNDED_DELAY: u32 = 500; //seconds
+pub const FIXED_BOUNDED_DELAY: u32 = 300; //seconds
 
 pub struct Producer {
     producer: FutureProducer<EmptyContext>,
