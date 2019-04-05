@@ -1,12 +1,11 @@
 extern crate timely;
 
-use std::collections::HashMap;
-use std::cmp::min;
-
 use crate::dto::post::Post;
 use crate::dto::comment::Comment;
 use crate::dto::common::Timestamped;
 use crate::operators::source::KafkaSource;
+
+use crate::dsa::stash::*;
 
 use timely::dataflow::operators::{Inspect, FrontierNotificator};
 use timely::dataflow::operators::generic::operator::Operator;
@@ -15,28 +14,11 @@ use timely::dataflow::channels::pact::Pipeline;
 const COLLECTION_PERIOD : usize = 1800; // seconds
 const MAX_DELAY : usize = 500; // seconds
 
-fn stash<T>(container : &mut HashMap<usize, Vec<T>>, time : usize, value : T) {
-    container
-        .entry(time)
-        .or_insert(vec![])
-        .push(value);
-}
-
-fn drain_period<T>(container : &mut HashMap<usize, Vec<T>>, t1 : usize, t2 : usize) -> Vec<T> {
-    let mut all = Vec::new();
-    for t in t1..t2 {
-        container
-            .entry(t)
-            .and_modify(|vec| all.extend(vec.drain(..)));
-    }
-    return all;
-}
-
 pub fn run() {
     timely::execute_from_args(std::env::args(), |worker| {
         worker.dataflow::<usize, _, _>(|scope| {
-            let mut comments_buffer: HashMap<usize, Vec<Comment>> = HashMap::new();
-            let mut posts_buffer: HashMap<usize, Vec<Post>> = HashMap::new();
+            let mut comments_buffer: Stash<Comment> = Stash::new();
+            let mut posts_buffer: Stash<Post> = Stash::new();
 
             let posts = scope.kafka_string_source::<Post>("posts".to_string());
             let comments = scope.kafka_string_source::<Comment>("comments".to_string());
@@ -55,7 +37,7 @@ pub fn run() {
                         for post in p_vector.drain(..) {
                             // buffer posts
                             let time = post.timestamp().clone();
-                            stash(&mut posts_buffer, post.timestamp(), post);
+                            posts_buffer.stash(post.timestamp(), post);
 
                             // schedule finding the first chronolgical event at first received event
                             if !scheduled {
@@ -70,7 +52,7 @@ pub fn run() {
                         // buffer comments
                         comments.swap(&mut c_vector);
                         for comment in c_vector.drain(..) {
-                            stash(&mut comments_buffer, comment.timestamp(), comment);
+                            comments_buffer.stash(comment.timestamp(), comment);
                         }
                     });
 
@@ -93,17 +75,13 @@ pub fn run() {
                             let mut session = output.session(&cap);
 
                             // process all posts
-                            for post in drain_period(
-                                &mut posts_buffer, time - COLLECTION_PERIOD, time
-                            ).drain(..) {
+                            for post in posts_buffer.extract(COLLECTION_PERIOD, time).drain(..) {
                                 // [TODO]: process posts
                                 println!("{:?}", post);
                             }
 
                             // process all comments
-                            for comment in drain_period(
-                                &mut comments_buffer, time - COLLECTION_PERIOD, time
-                            ).drain(..) {
+                            for comment in comments_buffer.extract(COLLECTION_PERIOD, time).drain(..) {
                                 // [TODO]: process comments
                                 println!("{:?}", comment);
                             }

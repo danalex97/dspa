@@ -2,6 +2,7 @@
 extern crate clap;
 
 mod dto;
+mod dsa;
 mod tasks;
 mod connection;
 mod operators;
