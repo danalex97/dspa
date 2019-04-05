@@ -62,70 +62,77 @@ pub fn run() {
             let mut likes_count_buffer = HashMap::new();
 
             posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY)
-                .binary_notify(&counted_likes, Pipeline, Pipeline, "AggregateLikes", None, move |p_input, l_input, output, notificator| {
-                    let mut p_data = Vec::new();
-                    p_input.for_each(|cap, input| {
-                        if output_epoch_start == 0 {
-                            // First post received
-                            output_epoch_start = cap.time().clone();
-                            output_epoch_start_times.push(output_epoch_start);
-                            notificator.notify_at(cap.delayed(&(output_epoch_start + COLLECTION_PERIOD)));
-                        }
-                        input.swap(&mut p_data);
-                        for post in p_data.drain(..) {
-                            //let time = post.timestamp().clone();
-                            let time = cap.time().clone();
-                            if time > output_epoch_start + COLLECTION_PERIOD {
-                                while time > output_epoch_start + COLLECTION_PERIOD {
-                                    // Ensure we have exact 30 min boundaries
-                                    output_epoch_start += COLLECTION_PERIOD;
-                                    output_epoch_start_times.push(output_epoch_start);
-                                }
+                .binary_notify(
+                    &counted_likes,
+                    Pipeline,
+                    Pipeline,
+                    "AggregateLikes",
+                    None,
+                    move |p_input, l_input, output, notificator| {
+                        let mut p_data = Vec::new();
+                        p_input.for_each(|cap, input| {
+                            if output_epoch_start == 0 {
+                                // First post received
+                                output_epoch_start = cap.time().clone();
+                                output_epoch_start_times.push(output_epoch_start);
                                 notificator.notify_at(cap.delayed(&(output_epoch_start + COLLECTION_PERIOD)));
                             }
-                            posts_buffer.entry(output_epoch_start).or_insert(vec![]).push(post);
-                        }
-                    });
+                            input.swap(&mut p_data);
+                            for post in p_data.drain(..) {
+                                //let time = post.timestamp().clone();
+                                let time = cap.time().clone();
+                                if time > output_epoch_start + COLLECTION_PERIOD {
+                                    while time > output_epoch_start + COLLECTION_PERIOD {
+                                        // Ensure we have exact 30 min boundaries
+                                        output_epoch_start += COLLECTION_PERIOD;
+                                        output_epoch_start_times.push(output_epoch_start);
+                                    }
+                                    notificator.notify_at(cap.delayed(&(output_epoch_start + COLLECTION_PERIOD)));
+                                }
+                                posts_buffer.entry(output_epoch_start).or_insert(vec![]).push(post);
+                            }
+                        });
 
-                    let mut l_data = Vec::new();
-                    l_input.for_each(|cap, input| {
-                       input.swap(&mut l_data);
-                        for (post, count) in l_data.drain(..) {
-                            let time = cap.time().clone();
-                            for epoch_start in output_epoch_start_times.iter() {
-                                if epoch_start + COLLECTION_PERIOD > time && time > *epoch_start {
-                                    let post_entry = likes_count_buffer.entry(epoch_start.clone()).or_insert(HashMap::new());
-                                    post_entry.entry(post)
-                                        .and_modify(|e| { *e += count })
-                                        .or_insert(count);
-                                    break;
+                        let mut l_data = Vec::new();
+                        l_input.for_each(|cap, input| {
+                            input.swap(&mut l_data);
+                            for (post, count) in l_data.drain(..) {
+                                let time = cap.time().clone();
+                                for epoch_start in output_epoch_start_times.iter() {
+                                    if epoch_start + COLLECTION_PERIOD > time && time > *epoch_start {
+                                        let post_entry = likes_count_buffer.entry(epoch_start.clone()).or_insert(HashMap::new());
+                                        post_entry.entry(post)
+                                            .and_modify(|e| { *e += count })
+                                            .or_insert(count);
+                                        break;
+                                    }
                                 }
                             }
-                        }
-                    });
+                        });
 
-                    notificator.for_each(|cap, count, notificator| {
-                        if let Some(mut new_posts) = posts_buffer.remove(&(cap.time() - COLLECTION_PERIOD)) {
-                            for post in new_posts.drain(..) {
-                                all_posts.insert(post.id, post);
-                            }
-                        }
-                        if let Some(mut post_likes) = likes_count_buffer.remove(&(cap.time() - COLLECTION_PERIOD)) {
-                            for (post, likes) in post_likes.drain() {
-                                match all_posts.get_mut(&post) {
-                                    None => {/* no-op, probably because data is ordered poorly */},
-                                    Some(post) => post.likes += likes,
+                        notificator.for_each(|cap, count, notificator| {
+                            if let Some(mut new_posts) = posts_buffer.remove(&(cap.time() - COLLECTION_PERIOD)) {
+                                for post in new_posts.drain(..) {
+                                    all_posts.insert(post.id, post);
                                 }
                             }
-                        }
-                        let counts: Vec<(u32, u32)> = all_posts.iter().map(|(id, post)| {
-                            (id.clone(), post.likes)
-                        }).collect();
-                        output.session(&cap).give(counts);
-                    });
+                            if let Some(mut post_likes) = likes_count_buffer.remove(&(cap.time() - COLLECTION_PERIOD)) {
+                                for (post, likes) in post_likes.drain() {
+                                    match all_posts.get_mut(&post) {
+                                        None => {/* no-op, probably because data is ordered poorly */},
+                                        Some(post) => post.likes += likes,
+                                    }
+                                }
+                            }
+                            let counts: Vec<(u32, u32)> = all_posts.iter().map(|(id, post)| {
+                                (id.clone(), post.likes)
+                            }).collect();
+                            output.session(&cap).give(counts);
+                        });
 
 
-                })
+                    }
+                )
                 .inspect_batch(|t, xs| println!("@{}: {:?}", t, xs));
         });
     }).unwrap();
