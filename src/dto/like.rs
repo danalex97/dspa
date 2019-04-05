@@ -7,11 +7,11 @@ use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
 use std::error::Error;
 
-#[derive(Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Like {
     pub person_id: u32,
     pub post_id: u32,
-    pub creation_date: DateTime<FixedOffset>,
+    pub timestamp: usize,
 }
 
 impl Importable<Like> for Like {
@@ -23,7 +23,7 @@ impl Importable<Like> for Like {
         Ok(Like{
             person_id,
             post_id,
-            creation_date,
+            timestamp: creation_date.timestamp() as usize,
         })
     }
 
@@ -34,6 +34,6 @@ impl Importable<Like> for Like {
 
 impl Timestamped for Like {
     fn timestamp(&self) -> usize {
-        return self.creation_date.timestamp() as usize;
+        self.timestamp
     }
 }
