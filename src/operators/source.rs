@@ -4,6 +4,7 @@ extern crate kafkaesque;
 extern crate csv;
 
 use crate::dto::common::{Importable, Timestamped};
+use crate::connection::producer::FIXED_BOUNDED_DELAY;
 
 use timely::dataflow::scopes::Scope;
 use timely::dataflow::Stream;
@@ -13,7 +14,6 @@ use rdkafka::config::ClientConfig;
 use rdkafka::consumer::{Consumer, BaseConsumer, EmptyConsumerContext};
 use csv::StringRecord;
 
-const FIXED_BOUNDED_DELAY: usize = 500; //seconds
 
 pub trait KafkaSource<G: Scope> {
     fn kafka_string_source<D : Importable<D> + Data + Timestamped>(&self, topic : String) -> Stream<G, D>;
