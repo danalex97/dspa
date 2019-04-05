@@ -69,7 +69,7 @@ pub fn run() {
                     });
 
                     notificator.for_each(|cap, _, _| {
-                        if let Some(mut map) = count_likes.remove(&(cap.time() - COLLECTION_PERIOD)) {
+                        if let Some(mut map) = count_likes.remove(&(cap.time() - FIXED_BOUNDED_DELAY)) {
                             output.session(&cap).give_iterator(map.drain());
                         }
                     });
