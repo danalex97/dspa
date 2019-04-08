@@ -13,7 +13,7 @@ pub struct Dsu<K : Hash + Eq + Clone, V> {
 }
 
 impl<K : Hash + Eq + Clone, V> Dsu<K, V> {
-    fn new() -> Dsu<K, V> {
+    pub fn new() -> Dsu<K, V> {
         Dsu {
             to_id : HashMap::new(),
             data : vec![],
@@ -50,6 +50,13 @@ impl<K : Hash + Eq + Clone, V> Dsu<K, V> {
     pub fn value(&mut self, key : K) -> Option<&V> {
         match self.to_id.get(&key) {
             Some(&id) => Some(&self.get(id).value),
+            None => None,
+        }
+    }
+
+    pub fn value_mut(&mut self, key : K) -> Option<&mut V> {
+        match self.to_id.get(&key) {
+            Some(&id) => Some(&mut self.get(id).value),
             None => None,
         }
     }

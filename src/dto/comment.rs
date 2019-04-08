@@ -10,6 +10,7 @@ use csv::StringRecord;
 
 use std::error::Error;
 use std::option::Option;
+use std::cmp::Ordering;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Comment {
@@ -59,5 +60,27 @@ impl Importable<Comment> for Comment {
 impl Timestamped for Comment {
     fn timestamp(&self) -> usize {
         self.timestamp
+    }
+}
+
+impl Ord for Comment {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.timestamp.cmp(&other.timestamp)
+    }
+}
+
+impl PartialOrd for Comment {
+    fn partial_cmp(&self, other: &Comment) -> Option<Ordering> {
+        self.timestamp.partial_cmp(&other.timestamp)
+    }
+}
+
+impl Eq for Comment {
+
+}
+
+impl PartialEq for Comment {
+    fn eq(&self, other: &Comment) -> bool {
+        self.timestamp.eq(&other.timestamp)
     }
 }

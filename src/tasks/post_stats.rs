@@ -19,14 +19,15 @@ use timely::dataflow::operators::probe::Probe;
 use timely::dataflow::operators::input::Input;
 use std::collections::HashMap;
 use std::hash::Hash;
+use self::timely::dataflow::operators::broadcast::Broadcast;
+use crate::dsa::dsu::Dsu;
+use std::collections::binary_heap::BinaryHeap;
 
 const COLLECTION_PERIOD : usize = 1800; // seconds
 
 pub fn run() {
     timely::execute_from_args(std::env::args(), |worker| {
         worker.dataflow::<usize, _, _>(|scope| {
-            let mut comments_buffer: Stash<Comment> = Stash::new();
-
             let posts = scope.kafka_string_source::<Post>("posts".to_string());
             let comments = scope.kafka_string_source::<Comment>("comments".to_string());
             let likes = scope.kafka_string_source::<Like>("likes".to_string());
@@ -36,12 +37,13 @@ pub fn run() {
                 FIXED_BOUNDED_DELAY
             );
 
-            let mut all_posts = HashMap::new();
+            //let mut all_posts = HashMap::new();
+            let mut all_posts = Dsu::new();
             let mut scheduled_first_notification = false;
             let mut posts_buffer: Stash<Post> = Stash::new();
             let mut likes_buffer: Stash<Like> = Stash::new();
 
-            posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY)
+            let aggregated_likes = posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY)
                 .binary_notify(
                     &buffered_likes,
                     Pipeline,
@@ -74,25 +76,77 @@ pub fn run() {
 
                         notificator.for_each(|cap, count, notificator| {
                             notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
+                            let mut new_posts = vec![];
                             for post in posts_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
-                                all_posts.insert(post.id, post);
+                                new_posts.push(post);
+                                all_posts.insert((0, post.id), (0, 0, 0));
                             }
                             for like in likes_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
-                                match all_posts.get_mut(&like.post_id) {
+                                match all_posts.value_mut((0, like.post_id)) {
                                     None => {/* no-op, probably because data is ordered poorly */},
-                                    Some(post) => post.likes += 1,
+                                    Some(counts) => counts.2 += 1,
                                 }
                             }
-                            let counts: Vec<(u32, u32)> = all_posts.iter().map(|(id, post)| {
-                                (id.clone(), post.likes)
-                            }).collect();
-                            output.session(&cap).give(counts);
+                            output.session(&cap).give_vec(&mut new_posts);
                         });
 
 
                     }
-                )
-                .inspect_batch(|t, xs| println!("@{}: {:?}", t, xs));
+                );
+
+            let mut comments_buffer: Stash<Comment> = Stash::new();
+            let mut dsu: Dsu<(u32, u32), (u32, u32, u32)> = Dsu::new();
+            comments.broadcast()
+                .binary_notify(
+                    &aggregated_likes,
+                    Pipeline,
+                    Pipeline,
+                    "MatchComments",
+                    None,
+                    move |c_input, p_input, output, notificator| {
+                        let mut c_data = Vec::new();
+                        c_input.for_each(|cap, input| {
+                            input.swap(&mut c_data);
+                            for comment in c_data.drain(..) {
+                                let time = comment.timestamp().clone();
+                                comments_buffer.stash(time, comment);
+                            }
+                        });
+
+                        p_input.for_each(|cap, _| {
+                            notificator.notify_at(cap.retain());
+                        });
+
+                        notificator.for_each(|cap, _, _| {
+                            let mut replies = BinaryHeap::new();
+                            for comment in comments_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
+                                match comment.reply_to_post_id {
+                                    Some(post_id) => {
+                                        // I'm a comment
+                                        match all_posts.value_mut((0, post_id)) {
+                                            None => {/*I'm not on this node*/},
+                                            Some((comments, _, _)) => {
+                                                add_edge(&all_posts, (0, post_id), (1, comment.id));
+                                                *comments += 1;
+                                            },
+                                        }
+                                    },
+                                    None => {
+                                        replies.push(comment);
+                                    }
+                                }
+                            }
+                            for reply in replies.into_sorted_vec().drain(..) {
+                                match all_posts.value_mut((1, reply.reply_to_comment_id.unwrap())) {
+                                    None => {/*I'm not on this node*/},
+                                    Some(_) => {
+                                        add_edge(&all_posts, (1, reply.reply_to_comment_id.unwrap()), (1, reply.id))
+                                    },
+                                }
+                            }
+                        })
+                    }
+                );
         });
     }).unwrap();
 }

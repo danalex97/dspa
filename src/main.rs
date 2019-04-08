@@ -38,4 +38,7 @@ fn main() {
     if let ("post-stats", _) = matches.subcommand() {
         post_stats::run();
     }
+
+    load::run(Some(1000));
+    post_stats::run();
 }
