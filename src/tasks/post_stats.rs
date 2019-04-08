@@ -19,18 +19,30 @@ use timely::dataflow::operators::probe::Probe;
 use timely::dataflow::operators::input::Input;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
-use self::timely::dataflow::operators::broadcast::Broadcast;
+use timely::dataflow::operators::broadcast::Broadcast;
 use crate::dsa::dsu::Dsu;
 use std::collections::binary_heap::BinaryHeap;
 
 const COLLECTION_PERIOD : usize = 1800; // seconds
 
-fn add_edge(dsu: &mut Dsu<(u32, u32), (u32, u32, u32)>, parent: (u32, u32), child: (u32, u32)) {
-    let r2 = match dsu.value(child) {
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
+pub enum KeyType {
+    Post,
+    Comment,
+}
+
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
+struct Key {
+    event : KeyType,
+    id : u32,
+}
+
+fn add_edge(dsu: &mut Dsu<Key, (u32, u32, u32)>, parent: Key, child: Key) {
+    let r2 = match dsu.value(child.clone()) {
         None => 0,
         Some((_, r2, _)) => *r2,
     };
-    match dsu.value_mut(parent) {
+    match dsu.value_mut(parent.clone()) {
         None => {},
         Some((_, replies, _)) => {
             *replies += r2;
@@ -92,26 +104,24 @@ pub fn run() {
                             notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
                             let mut new_posts = vec![];
                             for post in posts_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
+                                dsu.insert(Key{event: KeyType::Post, id :post.id}, (0, 0, 0));
                                 new_posts.push(post);
-                                dsu.insert((0, post.id.clone()), (0, 0, 0));
-                                all_posts.insert(post);
                             }
                             for like in likes_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
-                                match dsu.value_mut((0, like.post_id)) {
+                                match dsu.value_mut(Key{event: KeyType::Post, id : like.post_id}) {
                                     None => {/* no-op, probably because data is ordered poorly */},
                                     Some(counts) => counts.2 += 1,
                                 }
                             }
                             output.session(&cap).give_vec(&mut new_posts);
                         });
-
-
                     }
                 );
 
             let mut comments_buffer: Stash<Comment> = Stash::new();
-            let mut dsu: Dsu<(u32, u32), (u32, u32, u32)> = Dsu::new();
-            comments.broadcast()
+            let mut dsu: Dsu<Key, (u32, u32, u32)> = Dsu::new();
+            comments
+                .broadcast()
                 .binary_notify(
                     &aggregated_likes,
                     Pipeline,
@@ -128,8 +138,16 @@ pub fn run() {
                             }
                         });
 
-                        p_input.for_each(|cap, _| {
+                        let mut p_data = Vec::new();
+                        p_input.for_each(|cap, input| {
                             notificator.notify_at(cap.retain());
+
+                            // this shouldn't be done like this since the values might be in future
+                            // [TODO:] modify when looking at active posts
+                            input.swap(&mut p_data);
+                            for post in p_data.drain(..) {
+                                all_posts.insert(post);
+                            }
                         });
 
                         notificator.for_each(|cap, _, _| {
@@ -138,12 +156,21 @@ pub fn run() {
                                 match comment.reply_to_post_id {
                                     Some(post_id) => {
                                         // I'm a comment
-                                        match dsu.value_mut((0, post_id)) {
-                                            None => {/*I'm not on this node*/},
+                                        let mut correct_worker = false;
+                                        match dsu.value_mut(Key{event: KeyType::Post, id : post_id}) {
+                                            None => {},
                                             Some((comments, _, _)) => {
-                                                add_edge(&mut dsu, (0, post_id), (1, comment.id));
+                                                println!("yes {:?}", post_id);
+                                                correct_worker = true;
                                                 *comments += 1;
                                             },
+                                        }
+
+                                        if correct_worker {
+                                            add_edge(&mut dsu,
+                                                Key{event: KeyType::Post, id : post_id},
+                                                Key{event: KeyType::Comment, id : comment.id}
+                                            );
                                         }
                                     },
                                     None => {
@@ -152,17 +179,33 @@ pub fn run() {
                                 }
                             }
                             for reply in replies.into_sorted_vec().drain(..) {
-                                match dsu.value_mut((1, reply.reply_to_comment_id.unwrap())) {
-                                    None => {/*I'm not on this node*/},
+                                let parent_key = Key{
+                                    event: KeyType::Comment,
+                                    id: reply.reply_to_comment_id.unwrap(),
+                                };
+                                let key = Key{
+                                    event: KeyType::Comment,
+                                    id: reply.id,
+                                };
+                                match dsu.value_mut(parent_key.clone()) {
+                                    None => {},
                                     Some(_) => {
-                                        add_edge(&mut dsu, (1, reply.reply_to_comment_id.unwrap()), (1, reply.id))
+                                        add_edge(&mut dsu, parent_key, key)
                                     },
                                 }
                             }
-                            output.session(&cap).give_iterator(all_posts.iter());
+
+
+                            let mut session = output.session(&cap);
+                            for post in all_posts.iter() {
+                                match dsu.value(Key{event: KeyType::Post, id :post.id}) {
+                                    None => {},
+                                    Some(all) => session.give(all.clone()),
+                                }
+                            }
                         });
                     }
-                );
+                ).inspect(|x| println!("Out: {:?}", x));
         });
     }).unwrap();
 }

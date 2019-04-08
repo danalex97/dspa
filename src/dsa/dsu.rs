@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::fmt::Debug;
 
 struct Node<K, V> {
     parent : usize,
@@ -7,12 +8,12 @@ struct Node<K, V> {
     value : V,
 }
 
-pub struct Dsu<K : Hash + Eq + Clone, V> {
+pub struct Dsu<K : Hash + Eq + Clone + Debug, V> {
     to_id : HashMap<K, usize>,
     data : Vec<Node<K, V> >,
 }
 
-impl<K : Hash + Eq + Clone, V> Dsu<K, V> {
+impl<K : Hash + Eq + Clone + Debug, V> Dsu<K, V> {
     pub fn new() -> Dsu<K, V> {
         Dsu {
             to_id : HashMap::new(),
@@ -57,7 +58,7 @@ impl<K : Hash + Eq + Clone, V> Dsu<K, V> {
     pub fn value_mut(&mut self, key : K) -> Option<&mut V> {
         match self.to_id.get(&key) {
             Some(&id) => Some(&mut self.get(id).value),
-            None => None,
+            None => {println!("not in to_id {:?}", key); None},
         }
     }
 
