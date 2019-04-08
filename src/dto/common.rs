@@ -38,7 +38,7 @@ pub fn parse_vector<T>(raw_vector: &str) -> Result<Vec<T>, Box<Error>> where
     )
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Browser {
     Chrome,
     Firefox,

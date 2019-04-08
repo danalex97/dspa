@@ -17,7 +17,7 @@ pub struct Comment {
     pub person_id: u32,
     pub timestamp: usize,
     pub location_ip: std::net::Ipv4Addr,
-    // pub browser_used: Browser,
+    pub browser_used: Browser,
     pub content: String,
     pub reply_to_post_id: Option<u32>,
     pub reply_to_comment_id: Option<u32>,
@@ -31,7 +31,7 @@ impl Importable<Comment> for Comment {
         let person_id: u32 = record[1].parse()?;
         let creation_date = DateTime::parse_from_rfc3339(&record[2])?;
         let location_ip = record[3].parse()?;
-        //let browser_used = record[4].parse()?;
+        let browser_used = record[4].parse()?;
         let content = record[5].parse()?;
         let reply_to_post_id = maybe_record::<u32>(&record[6]);
         let reply_to_comment_id = maybe_record::<u32>(&record[7]);
@@ -42,7 +42,7 @@ impl Importable<Comment> for Comment {
             person_id,
             timestamp: creation_date.timestamp() as usize,
             location_ip,
-           // browser_used,
+            browser_used,
             content,
             reply_to_post_id,
             reply_to_comment_id,
