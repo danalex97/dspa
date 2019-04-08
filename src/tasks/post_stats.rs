@@ -4,96 +4,95 @@ use crate::dto::post::Post;
 use crate::dto::comment::Comment;
 use crate::dto::common::Timestamped;
 use crate::operators::source::KafkaSource;
+use crate::connection::producer::FIXED_BOUNDED_DELAY;
 
 use crate::dsa::stash::*;
 
 use timely::dataflow::operators::{Inspect, FrontierNotificator};
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::channels::pact::Pipeline;
+use timely::dataflow::channels::pact::Exchange;
+use crate::dto::like::Like;
+use crate::operators::buffer::Buffer;
+use timely::dataflow::ProbeHandle;
+use timely::dataflow::operators::probe::Probe;
+use timely::dataflow::operators::input::Input;
+use std::collections::HashMap;
+use std::hash::Hash;
 
 const COLLECTION_PERIOD : usize = 1800; // seconds
-const MAX_DELAY : usize = 500; // seconds
 
 pub fn run() {
     timely::execute_from_args(std::env::args(), |worker| {
         worker.dataflow::<usize, _, _>(|scope| {
             let mut comments_buffer: Stash<Comment> = Stash::new();
-            let mut posts_buffer: Stash<Post> = Stash::new();
 
             let posts = scope.kafka_string_source::<Post>("posts".to_string());
             let comments = scope.kafka_string_source::<Comment>("comments".to_string());
+            let likes = scope.kafka_string_source::<Like>("likes".to_string());
 
-            posts
-                .binary_notify(&comments, Pipeline, Pipeline, "CollectComments", None,
-                    move |p_input, c_input, output, notificator| {
-                    // note that we know that the timestamp of the first event should be from
-                    // a post, since we can't recive likes or comments without any post
-                    let mut scheduled = false;
-                    let mut first = true;
-                    let mut p_vector = Vec::new();
+            let buffered_likes = likes.buffer(
+                Exchange::new(|l: &Like| l.post_id as u64),
+                FIXED_BOUNDED_DELAY
+            );
 
-                    p_input.for_each(|cap, posts| {
-                        posts.swap(&mut p_vector);
-                        for post in p_vector.drain(..) {
-                            // buffer posts
-                            let time = post.timestamp().clone();
-                            posts_buffer.stash(post.timestamp(), post);
+            let mut all_posts = HashMap::new();
+            let mut scheduled_first_notification = false;
+            let mut posts_buffer: Stash<Post> = Stash::new();
+            let mut likes_buffer: Stash<Like> = Stash::new();
 
-                            // schedule finding the first chronolgical event at first received event
-                            if !scheduled {
-                                scheduled = true;
-                                notificator.notify_at(cap.delayed(&(time + MAX_DELAY)));
+            posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY)
+                .binary_notify(
+                    &buffered_likes,
+                    Pipeline,
+                    Pipeline,
+                    "AggregateLikes",
+                    None,
+                    move |p_input, l_input, output, notificator| {
+                        let mut p_data = Vec::new();
+                        p_input.for_each(|cap, input| {
+                            if !scheduled_first_notification {
+                                // First post received
+                                scheduled_first_notification = true;
+                                notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD - FIXED_BOUNDED_DELAY)));
                             }
-                        }
-                    });
+                            input.swap(&mut p_data);
+                            for post in p_data.drain(..) {
+                                let time = post.timestamp().clone();
+                                posts_buffer.stash(time, post);
+                            }
+                        });
 
-                    let mut c_vector = Vec::new();
-                    c_input.for_each(|cap, comments| {
-                        // buffer comments
-                        comments.swap(&mut c_vector);
-                        for comment in c_vector.drain(..) {
-                            comments_buffer.stash(comment.timestamp(), comment);
-                        }
-                    });
+                        let mut l_data = Vec::new();
+                        l_input.for_each(|cap, input| {
+                            input.swap(&mut l_data);
+                            for like in l_data.drain(..) {
+                                let time = like.timestamp().clone();
+                                likes_buffer.stash(time, like);
+                            }
+                        });
 
-                    notificator.for_each(|cap, _, notificator| {
-                        let time = cap.time().clone();
-
-                        if first {
-                            first = false;
-
-                            // find first event
-                            for t in time - MAX_DELAY..time {
-                                if posts_buffer.contains_key(&t) {
-                                    // found first event timestamp, so we periodic notifications
-                                    notificator.notify_at(cap.delayed(&(t + COLLECTION_PERIOD)));
-                                    break;
+                        notificator.for_each(|cap, count, notificator| {
+                            notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
+                            for post in posts_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
+                                all_posts.insert(post.id, post);
+                            }
+                            for like in likes_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
+                                match all_posts.get_mut(&like.post_id) {
+                                    None => {/* no-op, probably because data is ordered poorly */},
+                                    Some(post) => post.likes += 1,
                                 }
                             }
-                        } else {
-                            // get all newly created posts in last 30 minutes window
-                            let mut session = output.session(&cap);
+                            let counts: Vec<(u32, u32)> = all_posts.iter().map(|(id, post)| {
+                                (id.clone(), post.likes)
+                            }).collect();
+                            output.session(&cap).give(counts);
+                        });
 
-                            // process all posts
-                            for post in posts_buffer.extract(COLLECTION_PERIOD, time).drain(..) {
-                                // [TODO]: process posts
-                                println!("{:?}", post);
-                            }
 
-                            // process all comments
-                            for comment in comments_buffer.extract(COLLECTION_PERIOD, time).drain(..) {
-                                // [TODO]: process comments
-                                println!("{:?}", comment);
-                            }
-
-                            // [TODO]: simplify version
-                            session.give(1);
-
-                            // schedule next periodic notification
-                            notificator.notify_at(cap.delayed(&(time + COLLECTION_PERIOD)));
-                        }
-                    });
-                });
+                    }
+                )
+                .inspect_batch(|t, xs| println!("@{}: {:?}", t, xs));
         });
     }).unwrap();
 }

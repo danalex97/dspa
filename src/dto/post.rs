@@ -10,12 +10,13 @@ use csv::StringRecord;
 
 use std::error::Error;
 use std::vec::Vec;
+use crate::dto::comment::Comment;
 
-#[derive(Debug, Clone)]
+#[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Post {
     pub id: u32,
     pub person_id: u32,
-    pub creation_date: DateTime<FixedOffset>,
+    pub timestamp: usize,
     pub image_file: Option<String>,
     pub location_ip: std::net::Ipv4Addr,
     pub browser_used: String,
@@ -24,6 +25,8 @@ pub struct Post {
     pub tags: Vec<u32>,
     pub forum_id: u32,
     pub place_id: u32,
+    pub replies: Vec<Comment>,
+    pub likes: u32,
 }
 
 impl Importable<Post> for Post {
@@ -43,7 +46,7 @@ impl Importable<Post> for Post {
         Ok(Post{
             id,
             person_id,
-            creation_date,
+            timestamp: creation_date.timestamp() as usize,
             image_file,
             location_ip,
             browser_used,
@@ -52,6 +55,8 @@ impl Importable<Post> for Post {
             tags,
             forum_id,
             place_id,
+            replies: vec![],
+            likes: 0,
         })
     }
 
@@ -62,6 +67,6 @@ impl Importable<Post> for Post {
 
 impl Timestamped for Post {
     fn timestamp(&self) -> usize {
-        return self.creation_date.timestamp() as usize;
+        self.timestamp
     }
 }
