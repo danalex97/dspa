@@ -5,7 +5,7 @@ use crate::dto::common::maybe_record;
 use crate::dto::common::Browser;
 use crate::dto::common::{Importable, Timestamped};
 
-use chrono::{DateTime, FixedOffset};
+use chrono::DateTime;
 use csv::StringRecord;
 
 use std::cmp::Ordering;

@@ -1,27 +1,25 @@
 extern crate timely;
 
 use crate::connection::producer::FIXED_BOUNDED_DELAY;
+use crate::operators::source::KafkaSource;
+use crate::operators::buffer::Buffer;
+
+use crate::dto::like::Like;
 use crate::dto::comment::Comment;
 use crate::dto::common::Timestamped;
 use crate::dto::post::Post;
-use crate::operators::source::KafkaSource;
 
 use crate::dsa::stash::*;
-
 use crate::dsa::dsu::Dsu;
-use crate::dto::like::Like;
-use crate::operators::buffer::Buffer;
+
 use std::collections::binary_heap::BinaryHeap;
-use std::collections::{HashMap, HashSet};
-use std::hash::Hash;
+use std::collections::HashSet;
+
 use timely::dataflow::channels::pact::Exchange;
 use timely::dataflow::channels::pact::Pipeline;
-use timely::dataflow::operators::broadcast::Broadcast;
 use timely::dataflow::operators::generic::operator::Operator;
-use timely::dataflow::operators::input::Input;
-use timely::dataflow::operators::probe::Probe;
-use timely::dataflow::operators::{FrontierNotificator, Inspect};
-use timely::dataflow::ProbeHandle;
+use timely::dataflow::operators::broadcast::Broadcast;
+use timely::dataflow::operators::Inspect;
 
 const COLLECTION_PERIOD: usize = 1800; // seconds
 const POST: u32 = 0;
@@ -90,7 +88,7 @@ pub fn run() {
 
                         // stash all likes
                         let mut l_data = Vec::new();
-                        l_input.for_each(|cap, input| {
+                        l_input.for_each(|_, input| {
                             input.swap(&mut l_data);
                             for like in l_data.drain(..) {
                                 let time = like.timestamp().clone();
@@ -129,7 +127,7 @@ pub fn run() {
                     None,
                     move |c_input, p_input, output, notificator| {
                         let mut c_data = Vec::new();
-                        c_input.for_each(|cap, input| {
+                        c_input.for_each(|_, input| {
                             input.swap(&mut c_data);
                             for comment in c_data.drain(..) {
                                 let time = comment.timestamp().clone();

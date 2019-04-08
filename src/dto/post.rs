@@ -5,10 +5,9 @@ use crate::dto::common::maybe_record;
 use crate::dto::common::parse_vector;
 use crate::dto::common::{Importable, Timestamped};
 
-use chrono::{DateTime, FixedOffset};
+use chrono::DateTime;
 use csv::StringRecord;
 
-use crate::dto::comment::Comment;
 use std::error::Error;
 use std::vec::Vec;
 

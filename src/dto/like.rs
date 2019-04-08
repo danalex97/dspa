@@ -3,7 +3,7 @@ extern crate csv;
 
 use crate::dto::common::{Importable, Timestamped};
 
-use chrono::{DateTime, FixedOffset};
+use chrono::DateTime;
 use csv::StringRecord;
 use std::error::Error;
 
