@@ -58,10 +58,7 @@ impl<K: Hash + Eq + Clone + Debug, V> Dsu<K, V> {
     pub fn value_mut(&mut self, key: K) -> Option<&mut V> {
         match self.to_id.get(&key) {
             Some(&id) => Some(&mut self.get(id).value),
-            None => {
-                println!("not in to_id {:?}", key);
-                None
-            }
+            None => None,
         }
     }
 

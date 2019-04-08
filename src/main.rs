@@ -42,6 +42,6 @@ fn main() {
         post_stats::run();
     }
 
-    load::run(Some(10));
+    load::run(Some(200));
     post_stats::run();
 }
