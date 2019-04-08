@@ -8,9 +8,9 @@ use crate::dto::common::{Importable, Timestamped};
 use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
 
+use std::cmp::Ordering;
 use std::error::Error;
 use std::option::Option;
-use std::cmp::Ordering;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Comment {
@@ -38,7 +38,7 @@ impl Importable<Comment> for Comment {
         let reply_to_comment_id = maybe_record::<u32>(&record[7]);
         let place_id = record[8].parse()?;
 
-        Ok(Comment{
+        Ok(Comment {
             id,
             person_id,
             timestamp: creation_date.timestamp() as usize,
@@ -75,9 +75,7 @@ impl PartialOrd for Comment {
     }
 }
 
-impl Eq for Comment {
-
-}
+impl Eq for Comment {}
 
 impl PartialEq for Comment {
     fn eq(&self, other: &Comment) -> bool {

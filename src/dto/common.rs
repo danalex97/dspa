@@ -1,9 +1,9 @@
 extern crate csv;
 use csv::StringRecord;
 
+use std::error::Error;
 use std::str::FromStr;
 use std::vec::Vec;
-use std::error::Error;
 
 pub trait Importable<T> {
     fn from_record(raw_record: StringRecord) -> Result<T, Box<Error>>;
@@ -14,28 +14,30 @@ pub trait Timestamped {
     fn timestamp(&self) -> usize;
 }
 
-pub fn maybe_record<T : FromStr>(raw_record: &str) -> Option<T> {
+pub fn maybe_record<T: FromStr>(raw_record: &str) -> Option<T> {
     let parsed = raw_record.parse::<T>();
     match parsed {
         Ok(r) => Some(r),
-        Err(_) => None
+        Err(_) => None,
     }
 }
 
-pub fn parse_vector<T>(raw_vector: &str) -> Result<Vec<T>, Box<Error>> where
-        T: FromStr,
-        <T as std::str::FromStr>::Err: std::fmt::Debug, {
+pub fn parse_vector<T>(raw_vector: &str) -> Result<Vec<T>, Box<Error>>
+where
+    T: FromStr,
+    <T as std::str::FromStr>::Err: std::fmt::Debug,
+{
     if raw_vector.is_empty() {
-        return Ok(Vec::new())
+        return Ok(Vec::new());
     }
 
-    Ok(raw_vector.trim()
-                 .replace("[", "")
-                 .replace("]", "")
-                 .split(", ")
-                 .map(|x| {x.parse::<T>().unwrap()})
-                 .collect()
-    )
+    Ok(raw_vector
+        .trim()
+        .replace("[", "")
+        .replace("]", "")
+        .split(", ")
+        .map(|x| x.parse::<T>().unwrap())
+        .collect())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

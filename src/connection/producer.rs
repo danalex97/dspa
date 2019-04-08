@@ -2,15 +2,15 @@ extern crate futures;
 extern crate rand;
 extern crate rdkafka;
 
+use chrono::offset::TimeZone;
+use chrono::{DateTime, Duration, FixedOffset};
 use rand::Rng;
 use rdkafka::client::EmptyContext;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::FutureProducer;
-use chrono::{DateTime, FixedOffset, Duration};
-use std::fs::File;
-use std::io::{BufReader, BufRead};
 use std::collections::BinaryHeap;
-use chrono::offset::TimeZone;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 pub const FIXED_BOUNDED_DELAY: usize = 300; //seconds
 
@@ -29,9 +29,9 @@ impl Producer {
             .create::<FutureProducer<_>>()
             .expect("Producer creation error");
         Producer {
-            producer : producer,
-            topic : topic,
-            key : 0u32,
+            producer: producer,
+            topic: topic,
+            key: 0u32,
         }
     }
 
@@ -39,7 +39,9 @@ impl Producer {
         let f = File::open(file_name).unwrap();
         let f = BufReader::new(f);
 
-        let mut epoch_start_time = FixedOffset::east(0).ymd(2000, 1, 1).and_hms_milli(12, 0, 0, 0);
+        let mut epoch_start_time = FixedOffset::east(0)
+            .ymd(2000, 1, 1)
+            .and_hms_milli(12, 0, 0, 0);
         let mut buffer: BinaryHeap<(i64, String)> = BinaryHeap::new();
 
         let mut cnt = 0;
@@ -55,7 +57,7 @@ impl Producer {
                         Some(&data),
                         Some(&self.key.to_string()),
                         Some(time),
-                        0
+                        0,
                     );
                     self.key += 1;
                     cnt += 1;
@@ -68,7 +70,8 @@ impl Producer {
                 epoch_start_time = creation_time;
                 buffer = BinaryHeap::new();
             }
-            let offset = Duration::seconds(rand::thread_rng().gen_range(1, FIXED_BOUNDED_DELAY) as i64);
+            let offset =
+                Duration::seconds(rand::thread_rng().gen_range(1, FIXED_BOUNDED_DELAY) as i64);
             let insertion_time = creation_time + offset;
             buffer.push((insertion_time.timestamp(), line));
         }
@@ -80,7 +83,7 @@ impl Producer {
                 Some(&data),
                 Some(&self.key.to_string()),
                 Some(time),
-                0
+                0,
             );
             self.key += 1;
             cnt += 1;

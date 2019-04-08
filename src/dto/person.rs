@@ -1,11 +1,11 @@
 extern crate chrono;
 extern crate csv;
 
-use crate::dto::common::Importable;
 use crate::dto::common::Browser;
 use crate::dto::common::Gender;
+use crate::dto::common::Importable;
 
-use chrono::{NaiveDate, DateTime, FixedOffset};
+use chrono::{DateTime, FixedOffset, NaiveDate};
 use csv::StringRecord;
 use std::error::Error;
 

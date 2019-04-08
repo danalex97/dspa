@@ -1,2 +1,2 @@
-pub mod stash;
 pub mod dsu;
+pub mod stash;

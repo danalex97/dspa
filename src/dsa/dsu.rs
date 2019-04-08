@@ -1,27 +1,27 @@
 use std::collections::HashMap;
-use std::hash::Hash;
 use std::fmt::Debug;
+use std::hash::Hash;
 
 struct Node<K, V> {
-    parent : usize,
-    key : K,
-    value : V,
+    parent: usize,
+    key: K,
+    value: V,
 }
 
-pub struct Dsu<K : Hash + Eq + Clone + Debug, V> {
-    to_id : HashMap<K, usize>,
-    data : Vec<Node<K, V> >,
+pub struct Dsu<K: Hash + Eq + Clone + Debug, V> {
+    to_id: HashMap<K, usize>,
+    data: Vec<Node<K, V>>,
 }
 
-impl<K : Hash + Eq + Clone + Debug, V> Dsu<K, V> {
+impl<K: Hash + Eq + Clone + Debug, V> Dsu<K, V> {
     pub fn new() -> Dsu<K, V> {
         Dsu {
-            to_id : HashMap::new(),
-            data : vec![],
+            to_id: HashMap::new(),
+            data: vec![],
         }
     }
 
-    fn get(&mut self, id : usize) -> &mut Node<K, V> {
+    fn get(&mut self, id: usize) -> &mut Node<K, V> {
         // find root
         let mut root = id;
 
@@ -41,52 +41,53 @@ impl<K : Hash + Eq + Clone + Debug, V> Dsu<K, V> {
         &mut self.data[root]
     }
 
-    pub fn key(&mut self, key : K) -> Option<&K> {
+    pub fn key(&mut self, key: K) -> Option<&K> {
         match self.to_id.get(&key) {
             Some(id) => Some(&self.get(*id).key),
             None => None,
         }
     }
 
-    pub fn value(&mut self, key : K) -> Option<&V> {
+    pub fn value(&mut self, key: K) -> Option<&V> {
         match self.to_id.get(&key) {
             Some(&id) => Some(&self.get(id).value),
             None => None,
         }
     }
 
-    pub fn value_mut(&mut self, key : K) -> Option<&mut V> {
+    pub fn value_mut(&mut self, key: K) -> Option<&mut V> {
         match self.to_id.get(&key) {
             Some(&id) => Some(&mut self.get(id).value),
-            None => {println!("not in to_id {:?}", key); None},
+            None => {
+                println!("not in to_id {:?}", key);
+                None
+            }
         }
     }
 
-    pub fn union(&mut self, lhs : K, rhs : K) {
+    pub fn union(&mut self, lhs: K, rhs: K) {
         match self.to_id.get(&lhs) {
             Some(&lhs) => match self.to_id.get(&rhs) {
                 Some(&rhs) => {
                     // If both sides are ok, make a union
                     self.get(rhs).parent = self.get(lhs).parent;
-                },
+                }
                 None => {}
             },
             None => {}
         }
     }
 
-    pub fn insert(&mut self, key : K, value : V) {
+    pub fn insert(&mut self, key: K, value: V) {
         let k = key.clone();
-        let id = *self.to_id
-            .entry(key)
-            .or_insert(self.data.len());
+        let id = *self.to_id.entry(key).or_insert(self.data.len());
 
         if id == self.data.len() {
             // new value
-            self.data.push(Node{
-                parent : id,
-                key : k,
-                value : value,
+            self.data.push(Node {
+                parent: id,
+                key: k,
+                value: value,
             });
         } else {
             // different value

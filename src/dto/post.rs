@@ -1,16 +1,16 @@
 extern crate chrono;
 extern crate csv;
 
-use crate::dto::common::{Importable, Timestamped};
 use crate::dto::common::maybe_record;
 use crate::dto::common::parse_vector;
+use crate::dto::common::{Importable, Timestamped};
 
 use chrono::{DateTime, FixedOffset};
 use csv::StringRecord;
 
+use crate::dto::comment::Comment;
 use std::error::Error;
 use std::vec::Vec;
-use crate::dto::comment::Comment;
 
 #[derive(Deserialize, Serialize, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Post {
@@ -42,7 +42,7 @@ impl Importable<Post> for Post {
         let forum_id = record[9].parse()?;
         let place_id = record[10].parse()?;
 
-        Ok(Post{
+        Ok(Post {
             id,
             person_id,
             timestamp: creation_date.timestamp() as usize,

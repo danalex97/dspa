@@ -20,7 +20,7 @@ impl Importable<Like> for Like {
         let post_id = record[1].parse()?;
         let creation_date = DateTime::parse_from_rfc3339(&record[2])?;
 
-        Ok(Like{
+        Ok(Like {
             person_id,
             post_id,
             timestamp: creation_date.timestamp() as usize,

@@ -1,29 +1,29 @@
 extern crate timely;
 
-use crate::dto::post::Post;
+use crate::connection::producer::FIXED_BOUNDED_DELAY;
 use crate::dto::comment::Comment;
 use crate::dto::common::Timestamped;
+use crate::dto::post::Post;
 use crate::operators::source::KafkaSource;
-use crate::connection::producer::FIXED_BOUNDED_DELAY;
 
 use crate::dsa::stash::*;
 
-use timely::dataflow::operators::{Inspect, FrontierNotificator};
-use timely::dataflow::operators::generic::operator::Operator;
-use timely::dataflow::channels::pact::Pipeline;
-use timely::dataflow::channels::pact::Exchange;
+use crate::dsa::dsu::Dsu;
 use crate::dto::like::Like;
 use crate::operators::buffer::Buffer;
-use timely::dataflow::ProbeHandle;
-use timely::dataflow::operators::probe::Probe;
-use timely::dataflow::operators::input::Input;
+use std::collections::binary_heap::BinaryHeap;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use timely::dataflow::channels::pact::Exchange;
+use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::broadcast::Broadcast;
-use crate::dsa::dsu::Dsu;
-use std::collections::binary_heap::BinaryHeap;
+use timely::dataflow::operators::generic::operator::Operator;
+use timely::dataflow::operators::input::Input;
+use timely::dataflow::operators::probe::Probe;
+use timely::dataflow::operators::{FrontierNotificator, Inspect};
+use timely::dataflow::ProbeHandle;
 
-const COLLECTION_PERIOD : usize = 1800; // seconds
+const COLLECTION_PERIOD: usize = 1800; // seconds
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub enum KeyType {
@@ -33,8 +33,8 @@ pub enum KeyType {
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 struct Key {
-    event : KeyType,
-    id : u32,
+    event: KeyType,
+    id: u32,
 }
 
 fn add_edge(dsu: &mut Dsu<Key, (u32, u32, u32)>, parent: Key, child: Key) {
@@ -43,11 +43,11 @@ fn add_edge(dsu: &mut Dsu<Key, (u32, u32, u32)>, parent: Key, child: Key) {
         Some((_, r2, _)) => *r2,
     };
     match dsu.value_mut(parent.clone()) {
-        None => {},
+        None => {}
         Some((_, replies, _)) => {
             *replies += r2;
             dsu.union(parent, child);
-        },
+        }
     }
 }
 
@@ -60,7 +60,7 @@ pub fn run() {
 
             let buffered_likes = likes.buffer(
                 Exchange::new(|l: &Like| l.post_id as u64),
-                FIXED_BOUNDED_DELAY
+                FIXED_BOUNDED_DELAY,
             );
 
             let mut all_posts = HashSet::new();
@@ -69,7 +69,8 @@ pub fn run() {
             let mut posts_buffer: Stash<Post> = Stash::new();
             let mut likes_buffer: Stash<Like> = Stash::new();
 
-            let aggregated_likes = posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY)
+            let aggregated_likes = posts
+                .buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY)
                 .binary_notify(
                     &buffered_likes,
                     Pipeline,
@@ -82,7 +83,9 @@ pub fn run() {
                             if !scheduled_first_notification {
                                 // First post received
                                 scheduled_first_notification = true;
-                                notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD - FIXED_BOUNDED_DELAY)));
+                                notificator.notify_at(cap.delayed(
+                                    &(cap.time() + COLLECTION_PERIOD - FIXED_BOUNDED_DELAY),
+                                ));
                             }
                             input.swap(&mut p_data);
                             for post in p_data.drain(..) {
@@ -104,18 +107,27 @@ pub fn run() {
                             notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
                             let mut new_posts = vec![];
                             for post in posts_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
-                                dsu.insert(Key{event: KeyType::Post, id :post.id}, (0, 0, 0));
+                                dsu.insert(
+                                    Key {
+                                        event: KeyType::Post,
+                                        id: post.id,
+                                    },
+                                    (0, 0, 0),
+                                );
                                 new_posts.push(post);
                             }
                             for like in likes_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
-                                match dsu.value_mut(Key{event: KeyType::Post, id : like.post_id}) {
-                                    None => {/* no-op, probably because data is ordered poorly */},
+                                match dsu.value_mut(Key {
+                                    event: KeyType::Post,
+                                    id: like.post_id,
+                                }) {
+                                    None => { /* no-op, probably because data is ordered poorly */ }
                                     Some(counts) => counts.2 += 1,
                                 }
                             }
                             output.session(&cap).give_vec(&mut new_posts);
                         });
-                    }
+                    },
                 );
 
             let mut comments_buffer: Stash<Comment> = Stash::new();
@@ -157,55 +169,67 @@ pub fn run() {
                                     Some(post_id) => {
                                         // I'm a comment
                                         let mut correct_worker = false;
-                                        match dsu.value_mut(Key{event: KeyType::Post, id : post_id}) {
-                                            None => {},
+                                        match dsu.value_mut(Key {
+                                            event: KeyType::Post,
+                                            id: post_id,
+                                        }) {
+                                            None => {}
                                             Some((comments, _, _)) => {
                                                 println!("yes {:?}", post_id);
                                                 correct_worker = true;
                                                 *comments += 1;
-                                            },
+                                            }
                                         }
 
                                         if correct_worker {
-                                            add_edge(&mut dsu,
-                                                Key{event: KeyType::Post, id : post_id},
-                                                Key{event: KeyType::Comment, id : comment.id}
+                                            add_edge(
+                                                &mut dsu,
+                                                Key {
+                                                    event: KeyType::Post,
+                                                    id: post_id,
+                                                },
+                                                Key {
+                                                    event: KeyType::Comment,
+                                                    id: comment.id,
+                                                },
                                             );
                                         }
-                                    },
+                                    }
                                     None => {
                                         replies.push(comment);
                                     }
                                 }
                             }
                             for reply in replies.into_sorted_vec().drain(..) {
-                                let parent_key = Key{
+                                let parent_key = Key {
                                     event: KeyType::Comment,
                                     id: reply.reply_to_comment_id.unwrap(),
                                 };
-                                let key = Key{
+                                let key = Key {
                                     event: KeyType::Comment,
                                     id: reply.id,
                                 };
                                 match dsu.value_mut(parent_key.clone()) {
-                                    None => {},
-                                    Some(_) => {
-                                        add_edge(&mut dsu, parent_key, key)
-                                    },
+                                    None => {}
+                                    Some(_) => add_edge(&mut dsu, parent_key, key),
                                 }
                             }
 
-
                             let mut session = output.session(&cap);
                             for post in all_posts.iter() {
-                                match dsu.value(Key{event: KeyType::Post, id :post.id}) {
-                                    None => {},
+                                match dsu.value(Key {
+                                    event: KeyType::Post,
+                                    id: post.id,
+                                }) {
+                                    None => {}
                                     Some(all) => session.give(all.clone()),
                                 }
                             }
                         });
-                    }
-                ).inspect(|x| println!("Out: {:?}", x));
+                    },
+                )
+                .inspect(|x| println!("Out: {:?}", x));
         });
-    }).unwrap();
+    })
+    .unwrap();
 }
