@@ -64,12 +64,11 @@ pub fn run() {
             );
 
             let mut all_posts = HashSet::new();
-            let mut dsu = Dsu::new();
             let mut scheduled_first_notification = false;
             let mut posts_buffer: Stash<Post> = Stash::new();
             let mut likes_buffer: Stash<Like> = Stash::new();
 
-            let aggregated_likes = posts
+            let posts_with_likes = posts
                 .buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY)
                 .binary_notify(
                     &buffered_likes,
@@ -107,35 +106,23 @@ pub fn run() {
                             notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
                             let mut new_posts = vec![];
                             for post in posts_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
-                                dsu.insert(
-                                    Key {
-                                        event: KeyType::Post,
-                                        id: post.id,
-                                    },
-                                    (0, 0, 0),
-                                );
                                 new_posts.push(post);
                             }
                             for like in likes_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
-                                match dsu.value_mut(Key {
-                                    event: KeyType::Post,
-                                    id: like.post_id,
-                                }) {
-                                    None => { /* no-op, probably because data is ordered poorly */ }
-                                    Some(counts) => counts.2 += 1,
-                                }
+                                // [TODO:] we need the likes only to find the active period; that
+                                // is we do not need to actually count them
                             }
                             output.session(&cap).give_vec(&mut new_posts);
                         });
                     },
                 );
 
-            let mut comments_buffer: Stash<Comment> = Stash::new();
             let mut dsu: Dsu<Key, (u32, u32, u32)> = Dsu::new();
+            let mut comments_buffer: Stash<Comment> = Stash::new();
             comments
                 .broadcast()
                 .binary_notify(
-                    &aggregated_likes,
+                    &posts_with_likes,
                     Pipeline,
                     Pipeline,
                     "MatchComments",
@@ -154,10 +141,18 @@ pub fn run() {
                         p_input.for_each(|cap, input| {
                             notificator.notify_at(cap.retain());
 
-                            // this shouldn't be done like this since the values might be in future
-                            // [TODO:] modify when looking at active posts
                             input.swap(&mut p_data);
                             for post in p_data.drain(..) {
+                                // insert all values into DSU
+                                dsu.insert(
+                                    Key {
+                                        event: KeyType::Post,
+                                        id: post.id,
+                                    },
+                                    (0, 0, 0),
+                                );
+
+                                // [TODO]: modify when looking at active posts
                                 all_posts.insert(post);
                             }
                         });
