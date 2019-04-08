@@ -17,13 +17,27 @@ use crate::operators::buffer::Buffer;
 use timely::dataflow::ProbeHandle;
 use timely::dataflow::operators::probe::Probe;
 use timely::dataflow::operators::input::Input;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use self::timely::dataflow::operators::broadcast::Broadcast;
 use crate::dsa::dsu::Dsu;
 use std::collections::binary_heap::BinaryHeap;
 
 const COLLECTION_PERIOD : usize = 1800; // seconds
+
+fn add_edge(dsu: &mut Dsu<(u32, u32), (u32, u32, u32)>, parent: (u32, u32), child: (u32, u32)) {
+    let r2 = match dsu.value(child) {
+        None => 0,
+        Some((_, r2, _)) => *r2,
+    };
+    match dsu.value_mut(parent) {
+        None => {},
+        Some((_, replies, _)) => {
+            *replies += r2;
+            dsu.union(parent, child);
+        },
+    }
+}
 
 pub fn run() {
     timely::execute_from_args(std::env::args(), |worker| {
@@ -37,8 +51,8 @@ pub fn run() {
                 FIXED_BOUNDED_DELAY
             );
 
-            //let mut all_posts = HashMap::new();
-            let mut all_posts = Dsu::new();
+            let mut all_posts = HashSet::new();
+            let mut dsu = Dsu::new();
             let mut scheduled_first_notification = false;
             let mut posts_buffer: Stash<Post> = Stash::new();
             let mut likes_buffer: Stash<Like> = Stash::new();
@@ -79,10 +93,11 @@ pub fn run() {
                             let mut new_posts = vec![];
                             for post in posts_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
                                 new_posts.push(post);
-                                all_posts.insert((0, post.id), (0, 0, 0));
+                                dsu.insert((0, post.id.clone()), (0, 0, 0));
+                                all_posts.insert(post);
                             }
                             for like in likes_buffer.extract(COLLECTION_PERIOD, *cap.time()) {
-                                match all_posts.value_mut((0, like.post_id)) {
+                                match dsu.value_mut((0, like.post_id)) {
                                     None => {/* no-op, probably because data is ordered poorly */},
                                     Some(counts) => counts.2 += 1,
                                 }
@@ -123,10 +138,10 @@ pub fn run() {
                                 match comment.reply_to_post_id {
                                     Some(post_id) => {
                                         // I'm a comment
-                                        match all_posts.value_mut((0, post_id)) {
+                                        match dsu.value_mut((0, post_id)) {
                                             None => {/*I'm not on this node*/},
                                             Some((comments, _, _)) => {
-                                                add_edge(&all_posts, (0, post_id), (1, comment.id));
+                                                add_edge(&mut dsu, (0, post_id), (1, comment.id));
                                                 *comments += 1;
                                             },
                                         }
@@ -137,14 +152,15 @@ pub fn run() {
                                 }
                             }
                             for reply in replies.into_sorted_vec().drain(..) {
-                                match all_posts.value_mut((1, reply.reply_to_comment_id.unwrap())) {
+                                match dsu.value_mut((1, reply.reply_to_comment_id.unwrap())) {
                                     None => {/*I'm not on this node*/},
                                     Some(_) => {
-                                        add_edge(&all_posts, (1, reply.reply_to_comment_id.unwrap()), (1, reply.id))
+                                        add_edge(&mut dsu, (1, reply.reply_to_comment_id.unwrap()), (1, reply.id))
                                     },
                                 }
                             }
-                        })
+                            output.session(&cap).give_iterator(all_posts.iter());
+                        });
                     }
                 );
         });

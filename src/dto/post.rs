@@ -12,7 +12,7 @@ use std::error::Error;
 use std::vec::Vec;
 use crate::dto::comment::Comment;
 
-#[derive(Deserialize, Serialize, Clone, Debug)]
+#[derive(Deserialize, Serialize, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Post {
     pub id: u32,
     pub person_id: u32,
@@ -25,7 +25,6 @@ pub struct Post {
     pub tags: Vec<u32>,
     pub forum_id: u32,
     pub place_id: u32,
-    pub replies: Vec<Comment>,
     pub likes: u32,
 }
 
@@ -55,7 +54,6 @@ impl Importable<Post> for Post {
             tags,
             forum_id,
             place_id,
-            replies: vec![],
             likes: 0,
         })
     }
