@@ -29,13 +29,13 @@ impl<K: Hash + Eq + Clone + Debug, V> Dsu<K, V> {
             root = self.data[root].parent;
         }
 
-        // compress path
-        let mut cur = id;
-        while self.data[cur].parent != root {
-            let next = self.data[cur].parent;
-            self.data[cur].parent = root;
-            cur = next;
-        }
+        // // compress path
+        // let mut cur = id;
+        // while self.data[cur].parent != root {
+        //     let next = self.data[cur].parent;
+        //     self.data[cur].parent = root;
+        //     cur = next;
+        // }
 
         // return relevant node
         &mut self.data[root]
@@ -50,14 +50,14 @@ impl<K: Hash + Eq + Clone + Debug, V> Dsu<K, V> {
 
     pub fn value(&mut self, key: K) -> Option<&V> {
         match self.to_id.get(&key) {
-            Some(&id) => Some(&self.get(id).value),
+            Some(id) => Some(&self.get(*id).value),
             None => None,
         }
     }
 
     pub fn value_mut(&mut self, key: K) -> Option<&mut V> {
         match self.to_id.get(&key) {
-            Some(&id) => Some(&mut self.get(id).value),
+            Some(id) => Some(&mut self.get(*id).value),
             None => None,
         }
     }
