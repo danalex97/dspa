@@ -1,24 +1,43 @@
 extern crate csv;
-extern crate kafkaesque;
 extern crate rdkafka;
+extern crate rdkafka_sys;
 extern crate timely;
+extern crate futures;
 
 use crate::connection::producer::FIXED_BOUNDED_DELAY;
 use crate::dto::common::{Importable, Timestamped};
 
+use timely::dataflow::operators::generic::operator::source;
 use timely::dataflow::scopes::Scope;
 use timely::dataflow::Stream;
 use timely::Data;
 
+use rdkafka::message::{Message, Headers};
+use rdkafka::client::ClientContext;
+use rdkafka::consumer::{Consumer, ConsumerContext, CommitMode, Rebalance};
+use rdkafka::consumer::stream_consumer::StreamConsumer;
+use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
+use rdkafka::util::get_rdkafka_version;
+use rdkafka::error::KafkaResult;
+use futures::stream::Stream as FutureStream;
+
 use csv::StringRecord;
-use rdkafka::config::ClientConfig;
-use rdkafka::consumer::{BaseConsumer, Consumer, EmptyConsumerContext};
 
 pub trait KafkaSource<G: Scope> {
     fn kafka_string_source<D: Importable<D> + Data + Timestamped>(
         &self,
         topic: String,
     ) -> Stream<G, D>;
+}
+
+struct CustomContext;
+
+impl ClientContext for CustomContext {}
+
+impl ConsumerContext for CustomContext {
+    fn pre_rebalance(&self, _: &Rebalance) {}
+    fn post_rebalance(&self, _: &Rebalance) {}
+    fn commit_callback(&self, _: KafkaResult<()>, _: *mut rdkafka_sys::RDKafkaTopicPartitionList) {}
 }
 
 impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
@@ -28,9 +47,9 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
     ) -> Stream<G, D> {
         // Extract Kafka topic.
         let brokers = "localhost:9092";
+        let context = CustomContext;
 
         // Create Kafka consumer configuration.
-        // Feel free to change parameters here.
         let mut consumer_config = ClientConfig::new();
         consumer_config
             .set("produce.offset.report", "true")
@@ -42,41 +61,52 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
             .set("bootstrap.servers", &brokers);
 
         // Create a Kafka consumer.
-        let consumer: BaseConsumer<EmptyConsumerContext> =
-            consumer_config.create().expect("Couldn't create consumer");
+        let consumer: StreamConsumer<CustomContext> = consumer_config
+            .create_with_context(context)
+            .expect("Couldn't create consumer");
         consumer
             .subscribe(&[&topic])
             .expect("Failed to subscribe to topic");
 
-        kafkaesque::source(
-            self,
-            "KafkaStringSource",
-            consumer,
-            |bytes, capability, output| {
-                // If the bytes are utf8, convert to string and send.
-                if let Ok(text) = std::str::from_utf8(bytes) {
-                    let v: Vec<&str> = text.split("|").collect();
-                    let record = StringRecord::from(v);
+        source(self, "Source", |capability, _| {
+            let mut cap = Some(capability);
 
-                    match D::from_record(record) {
-                        Ok(record) => {
-                            let capability_time = *capability.time();
-                            let candidate_time = record.timestamp() - FIXED_BOUNDED_DELAY;
+            move |output| {
+                let message_stream = consumer.start();
+                for message in message_stream.wait() {
+                    match message {
+                        Err(_) => println!("Error while reading from stream."),
+                        Ok(Err(e)) => println!("Kafka error: {}", e),
+                        Ok(Ok(m)) => match m.payload_view::<str>() {
+                            None => {},
+                            Some(Err(e)) => {},
+                            Some(Ok(text)) => {
+                                // process payload
+                                let v: Vec<&str> = text.split("|").collect();
+                                let record = StringRecord::from(v);
 
-                            // I have a tighter bound for downgrading the capability
-                            if capability_time < candidate_time {
-                                capability.downgrade(&candidate_time);
-                            }
+                                match D::from_record(record) {
+                                    Ok(record) => {
+                                        if let Some(cap) = cap.as_mut() {
+                                            let capability_time = cap.time().clone();
+                                            let candidate_time = record.timestamp() - FIXED_BOUNDED_DELAY;
 
-                            output.session(capability).give(record);
-                        }
-                        Err(_) => {}
-                    }
+                                            println!("{:?} {:?}", capability_time, candidate_time);
+                                            // I have a tighter bound for downgrading the capability
+                                            if capability_time < candidate_time {
+                                                cap.downgrade(&candidate_time);
+                                            }
+
+                                            output.session(&cap).give(record);
+                                        }
+                                    }
+                                    Err(_) => {}
+                                }
+                            },
+                        },
+                    };
                 }
-
-                // Indicate that we are not yet done.
-                false
-            },
-        )
+            }
+        })
     }
 }

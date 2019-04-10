@@ -5,9 +5,8 @@ extern crate rdkafka;
 use chrono::offset::TimeZone;
 use chrono::{DateTime, Duration, FixedOffset};
 use rand::Rng;
-use rdkafka::client::EmptyContext;
 use rdkafka::config::ClientConfig;
-use rdkafka::producer::FutureProducer;
+use rdkafka::producer::{FutureProducer, FutureRecord};
 use std::collections::BinaryHeap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -15,7 +14,7 @@ use std::io::{BufRead, BufReader};
 pub const FIXED_BOUNDED_DELAY: usize = 300; //seconds
 
 pub struct Producer {
-    producer: FutureProducer<EmptyContext>,
+    producer: FutureProducer,
     topic: String,
     key: u32,
 }
@@ -26,7 +25,7 @@ impl Producer {
             .set("bootstrap.servers", "localhost:9092")
             .set("produce.offset.report", "true")
             .set("message.timeout.ms", "5000")
-            .create::<FutureProducer<_>>()
+            .create()
             .expect("Producer creation error");
         Producer {
             producer: producer,
@@ -51,12 +50,11 @@ impl Producer {
             let creation_time = DateTime::parse_from_rfc3339(fields[2]).unwrap();
             if creation_time > epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64) {
                 for (time, data) in buffer.into_sorted_vec() {
-                    self.producer.send_copy(
-                        &self.topic,
-                        None,
-                        Some(&data),
-                        Some(&self.key.to_string()),
-                        Some(time),
+                    self.producer.send(
+                        FutureRecord::to(&self.topic)
+                            .payload(&data)
+                            .key(&self.key.to_string())
+                            .timestamp(time),
                         0,
                     );
                     self.key += 1;
@@ -77,12 +75,11 @@ impl Producer {
         }
 
         for (time, data) in buffer.into_sorted_vec() {
-            self.producer.send_copy(
-                &self.topic,
-                None,
-                Some(&data),
-                Some(&self.key.to_string()),
-                Some(time),
+            self.producer.send(
+                FutureRecord::to(&self.topic)
+                    .payload(&data)
+                    .key(&self.key.to_string())
+                    .timestamp(time),
                 0,
             );
             self.key += 1;

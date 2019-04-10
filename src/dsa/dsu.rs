@@ -29,13 +29,13 @@ impl<K: Hash + Eq + Clone + Debug, V> Dsu<K, V> {
             root = self.data[root].parent;
         }
 
-        // // compress path
-        // let mut cur = id;
-        // while self.data[cur].parent != root {
-        //     let next = self.data[cur].parent;
-        //     self.data[cur].parent = root;
-        //     cur = next;
-        // }
+        // compress path
+        let mut cur = id;
+        while self.data[cur].parent != root {
+            let next = self.data[cur].parent;
+            self.data[cur].parent = root;
+            cur = next;
+        }
 
         // return relevant node
         &mut self.data[root]
@@ -119,4 +119,11 @@ fn test_dsu() {
     dsu.insert(2, "d");
     assert!(dsu.value(2) == Some(&"d"));
     assert!(dsu.value(5) == Some(&"d"));
+
+    dsu.insert(5, "e");
+    assert!(dsu.value(5) == Some(&"e"));
+    assert!(dsu.value(2) == Some(&"e"));
+
+    dsu.insert(1, "d");
+    assert!(dsu.value(1) == Some(&"d"));
 }
