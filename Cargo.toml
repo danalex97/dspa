@@ -14,8 +14,5 @@ rand = "0.6"
 rdkafka = "0.14.0"
 serde = "1.0.90"
 serde_derive = "1.0.90"
-timely = {git = "https://github.com/danalex97/timely-dataflow" }
+timely = {git = "https://github.com/danalex97/timely-dataflow", features = ["bincode"] }
 timely_communication = {git = "https://github.com/danalex97/timely-dataflow" }
-
-[features]
-bincode= ["timely_communication/bincode"]
