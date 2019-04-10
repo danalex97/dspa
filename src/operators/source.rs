@@ -98,7 +98,6 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
                                             let candidate_time =
                                                 record.timestamp() - FIXED_BOUNDED_DELAY;
 
-                                            println!("{:?} {:?}", capability_time, candidate_time);
                                             // I have a tighter bound for downgrading the capability
                                             if capability_time < candidate_time {
                                                 cap.downgrade(&candidate_time);

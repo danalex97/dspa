@@ -27,9 +27,6 @@ pub fn run() {
             let comments = scope.kafka_string_source::<Comment>("comments".to_string());
             let likes = scope.kafka_string_source::<Like>("likes".to_string());
 
-            posts.inspect(|x| println!("{:?}", x));
-            comments.inspect(|x| println!("{:?}", x));
-
             let buffered_likes = likes.buffer(
                 Exchange::new(|l: &Like| l.post_id as u64),
                 FIXED_BOUNDED_DELAY,
@@ -45,7 +42,7 @@ pub fn run() {
             comments
                 .broadcast()
                 .link_replies(&buffered_posts, Pipeline, Pipeline, FIXED_BOUNDED_DELAY)
-                .inspect(|x| println!("{:?} {:?}", x.reply_to_post_id, x.reply_to_comment_id));
+                .inspect(|x| println!("{:?} {:?} {:?}", x.id, x.reply_to_post_id, x.reply_to_comment_id));
         });
     })
     .unwrap();
