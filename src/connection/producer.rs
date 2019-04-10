@@ -55,7 +55,7 @@ impl Producer {
                             .payload(&data)
                             .key(&self.key.to_string())
                             .timestamp(time),
-                        0,
+                        1000,
                     );
                     self.key += 1;
                     cnt += 1;
