@@ -9,7 +9,6 @@ pub trait Buffer<G: Scope, P: ParallelizationContract<usize, D>, D: Data> {
     fn buffer(&self, pact: P, delay: usize) -> Stream<G, D>;
 }
 
-// [TODO]: does it make sense to buffer operators separately or all at once?
 impl<G: Scope<Timestamp = usize>, P: ParallelizationContract<usize, D>, D: Data + Timestamped>
     Buffer<G, P, D> for Stream<G, D>
 {
