@@ -48,49 +48,52 @@ pub fn run() {
                 FIXED_BOUNDED_DELAY,
             );
 
-            linked_comments.binary_notify(
-                &buffered_likes,
-                Pipeline,
-                Pipeline,
-                "LinkCommentsLikes",
-                None,
-                move |c_input, l_input, output, notificator| {
-                    let mut c_data = Vec::new();
-                    c_input.for_each(|cap, input| {
-                        input.swap(&mut c_data);
-                        for comment in c_data.drain(..) {
-                            let time = comment.timestamp().clone();
-                            comments_buffer.stash(time, comment);
-                        }
-                        notificator.notify_at(cap.retain());
-                    });
-                    let mut l_data = Vec::new();
-                    l_input.for_each(|cap, input| {
-                        input.swap(&mut l_data);
-                        for like in l_data.drain(..) {
-                            let time = like.timestamp().clone();
-                            likes_buffer.stash(time, like);
-                        }
-                        notificator.notify_at(cap.retain());
-                    });
+            linked_comments
+                .binary_notify(
+                    &buffered_likes,
+                    Pipeline,
+                    Pipeline,
+                    "LinkCommentsLikes",
+                    None,
+                    move |c_input, l_input, output, notificator| {
+                        let mut c_data = Vec::new();
+                        c_input.for_each(|cap, input| {
+                            input.swap(&mut c_data);
+                            for comment in c_data.drain(..) {
+                                let time = comment.timestamp().clone();
+                                comments_buffer.stash(time, comment);
+                            }
+                            notificator.notify_at(cap.retain());
+                        });
+                        let mut l_data = Vec::new();
+                        l_input.for_each(|cap, input| {
+                            input.swap(&mut l_data);
+                            for like in l_data.drain(..) {
+                                let time = like.timestamp().clone();
+                                likes_buffer.stash(time, like);
+                            }
+                            notificator.notify_at(cap.retain());
+                        });
 
-                    notificator.for_each(|cap, _, _| {
-                        let mut session = output.session(&cap);
-                        let comments = comments_buffer.extract(FIXED_BOUNDED_DELAY, *cap.time());
-                        let likes = likes_buffer.extract(FIXED_BOUNDED_DELAY, *cap.time());
-                        let mut likes_timestamps: Vec<_> = likes
-                            .iter()
-                            .map(|l: &Like| (l.timestamp, l.post_id))
-                            .collect();
-                        let mut comments_timestamps: Vec<_> = comments
-                            .iter()
-                            .map(|c: &Comment| (c.timestamp, c.reply_to_post_id.unwrap()))
-                            .collect();
-                        session.give_vec(&mut likes_timestamps);
-                        session.give_vec(&mut comments_timestamps);
-                    })
-                },
-            ).inspect(|x| println!("{:?}", x));
+                        notificator.for_each(|cap, _, _| {
+                            let mut session = output.session(&cap);
+                            let comments =
+                                comments_buffer.extract(FIXED_BOUNDED_DELAY, *cap.time());
+                            let likes = likes_buffer.extract(FIXED_BOUNDED_DELAY, *cap.time());
+                            let mut likes_timestamps: Vec<_> = likes
+                                .iter()
+                                .map(|l: &Like| (l.timestamp, l.post_id))
+                                .collect();
+                            let mut comments_timestamps: Vec<_> = comments
+                                .iter()
+                                .map(|c: &Comment| (c.timestamp, c.reply_to_post_id.unwrap()))
+                                .collect();
+                            session.give_vec(&mut likes_timestamps);
+                            session.give_vec(&mut comments_timestamps);
+                        })
+                    },
+                )
+                .inspect(|x| println!("{:?}", x));
         });
     })
     .unwrap();

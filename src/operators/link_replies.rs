@@ -8,16 +8,24 @@ use timely::Data;
 use crate::dto::comment::Comment;
 use crate::dto::post::Post;
 
-use crate::dsa::stash::*;
 use crate::dsa::dsu::*;
+use crate::dsa::stash::*;
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::HashSet;
 
-pub trait LinkReplies<G, P, P2> where
-        G: Scope,
-        P: ParallelizationContract<usize, Comment>,
-        P2: ParallelizationContract<usize, Post> {
-    fn link_replies(&self, posts: &Stream<G, Post>, c_pact: P, p_pact: P2, delay: usize) -> Stream<G, Comment>;
+pub trait LinkReplies<G, P, P2>
+where
+    G: Scope,
+    P: ParallelizationContract<usize, Comment>,
+    P2: ParallelizationContract<usize, Post>,
+{
+    fn link_replies(
+        &self,
+        posts: &Stream<G, Post>,
+        c_pact: P,
+        p_pact: P2,
+        delay: usize,
+    ) -> Stream<G, Comment>;
 }
 
 const POST: u32 = 0;
@@ -27,10 +35,10 @@ type Node = (u32, u32);
 
 fn add_edge(dsu: &mut Dsu<Node, Option<u32>>, parent: Node, child: Node) {
     match dsu.value(child.clone()) {
-        None => {},
+        None => {}
         Some(child_value) => {
             assert!(child_value.is_none());
-        },
+        }
     };
     // println!("parent: {:?} {:?}", parent, dsu.key(parent));
     // println!("child: {:?} {:?}", child, dsu.key(child));
@@ -43,11 +51,19 @@ fn add_edge(dsu: &mut Dsu<Node, Option<u32>>, parent: Node, child: Node) {
     }
 }
 
-impl<G, P, P2> LinkReplies<G, P, P2> for Stream<G, Comment> where
-        G: Scope<Timestamp = usize>,
-        P: ParallelizationContract<usize, Comment>,
-        P2: ParallelizationContract<usize, Post> {
-    fn link_replies(&self, posts: &Stream<G, Post>, c_pact: P, p_pact: P2, delay: usize) -> Stream<G, Comment> {
+impl<G, P, P2> LinkReplies<G, P, P2> for Stream<G, Comment>
+where
+    G: Scope<Timestamp = usize>,
+    P: ParallelizationContract<usize, Comment>,
+    P2: ParallelizationContract<usize, Post>,
+{
+    fn link_replies(
+        &self,
+        posts: &Stream<G, Post>,
+        c_pact: P,
+        p_pact: P2,
+        delay: usize,
+    ) -> Stream<G, Comment> {
         let mut dsu: Dsu<Node, Option<u32>> = Dsu::new();
         let mut comments_buffer: Stash<Comment> = Stash::new();
 
@@ -68,7 +84,6 @@ impl<G, P, P2> LinkReplies<G, P, P2> for Stream<G, Comment> where
                     }
                 });
 
-
                 let mut p_data = Vec::new();
                 p_input.for_each(|cap, input| {
                     input.swap(&mut p_data);
@@ -79,9 +94,7 @@ impl<G, P, P2> LinkReplies<G, P, P2> for Stream<G, Comment> where
 
                     // notify in the future with delay so that we have the
                     // guarantee that all replies are attached to comments
-                    notificator.notify_at(cap.delayed(
-                        &(cap.time() + delay),
-                    ));
+                    notificator.notify_at(cap.delayed(&(cap.time() + delay)));
                 });
 
                 notificator.for_each(|cap, _, _| {
@@ -99,12 +112,12 @@ impl<G, P, P2> LinkReplies<G, P, P2> for Stream<G, Comment> where
                                 // insert comment if post present
                                 match dsu.value((POST, post_id)) {
                                     Some(_) => dsu.insert((COMMENT, comment.id), None),
-                                    None    => {/* the post is on a different worker */},
+                                    None => { /* the post is on a different worker */ }
                                 }
 
                                 // add edge
                                 add_edge(&mut dsu, (POST, post_id), (COMMENT, comment.id));
-                            },
+                            }
                             None => {
                                 // reply
                                 replies.push(comment);
@@ -119,13 +132,13 @@ impl<G, P, P2> LinkReplies<G, P, P2> for Stream<G, Comment> where
                                 // insert reply if comment present
                                 match dsu.value((COMMENT, comm_id)) {
                                     Some(_) => dsu.insert((COMMENT, reply.id), None),
-                                    None    => {/* the comment is on a different worker */},
+                                    None => { /* the comment is on a different worker */ }
                                 }
 
                                 // add edge
                                 add_edge(&mut dsu, (COMMENT, comm_id), (COMMENT, reply.id));
                             }
-                            None => {/* reply attached to nothing */},
+                            None => { /* reply attached to nothing */ }
                         }
                     }
 
@@ -133,7 +146,7 @@ impl<G, P, P2> LinkReplies<G, P, P2> for Stream<G, Comment> where
                     let mut session = output.session(&cap);
                     for mut comment in all_comments.drain(..) {
                         match dsu.value((COMMENT, comment.id)) {
-                            None => {/* comment/reply is not attached to our post */}
+                            None => { /* comment/reply is not attached to our post */ }
                             Some(maybe_post) => {
                                 if let Some(post) = maybe_post {
                                     comment.reply_to_post_id = Some(*post);
@@ -143,7 +156,7 @@ impl<G, P, P2> LinkReplies<G, P, P2> for Stream<G, Comment> where
                         }
                     }
                 });
-            }
+            },
         )
     }
 }

@@ -32,16 +32,17 @@ fn main() {
     if let ("load", Some(args)) = matches.subcommand() {
         let records = match value_t!(args.value_of("records"), usize) {
             Ok(records) => Some(records),
-            Err(_) => None,
+            Err(_) => Some(1000),
         };
 
         load::run(records);
+        return;
     }
 
     if let ("post-stats", _) = matches.subcommand() {
         post_stats::run();
     }
 
-    load::run(Some(100));
+    load::run(Some(1000));
     post_stats::run();
 }
