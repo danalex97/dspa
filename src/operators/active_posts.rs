@@ -9,6 +9,7 @@ use crate::dto::like::Like;
 
 use crate::dsa::stash::*;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 pub trait ActivePosts<G, P, P2>
 where
@@ -23,7 +24,7 @@ where
         l_pact: P2,
         delay: usize,
         active_post_period: usize,
-    ) -> Stream<G, u32>;
+    ) -> Stream<G, (u32, usize)>;
 }
 
 // PRE: likes and comments are buffered
@@ -33,6 +34,7 @@ where
     P: ParallelizationContract<usize, Comment>,
     P2: ParallelizationContract<usize, Like>,
 {
+    // outputs (post id, user ids)
     fn active_post_ids(
         &self,
         likes: &Stream<G, Like>,
@@ -40,10 +42,13 @@ where
         l_pact: P2,
         delay: usize,
         active_post_period: usize,
-    ) -> Stream<G, u32> {
+    ) -> Stream<G, (u32, usize)> {
         let mut comments_buffer: Stash<Comment> = Stash::new();
         let mut likes_buffer: Stash<Like> = Stash::new();
         let mut last_active_time: HashMap<u32, Option<usize>> = HashMap::new();
+
+        // all persons that interact with this post from the beginning
+        let mut interactions_by_post = HashMap::new();
 
         self.binary_notify(
             &likes,
@@ -78,18 +83,19 @@ where
                     // get timestamps for likes and comments
                     let comments = comments_buffer.extract(delay, *cap.time());
                     let likes = likes_buffer.extract(delay, *cap.time());
-                    let mut likes_timestamps: Vec<_> = likes
+
+                    let mut likes: Vec<_> = likes
                         .iter()
-                        .map(|l: &Like| (l.timestamp, l.post_id))
+                        .map(|l: &Like| (l.timestamp, l.post_id, l.person_id))
                         .collect();
-                    let mut comments_timestamps: Vec<_> = comments
+                    let mut comments: Vec<_> = comments
                         .iter()
-                        .map(|c: &Comment| (c.timestamp, c.reply_to_post_id.unwrap()))
+                        .map(|c: &Comment| (c.timestamp, c.reply_to_post_id.unwrap(), c.person_id))
                         .collect();
 
                     // group all timestamp together
-                    let mut all_timestamps = likes_timestamps;
-                    all_timestamps.append(&mut comments_timestamps);
+                    let mut all_info = likes;
+                    all_info.append(&mut comments);
 
                     // update all stale entries even if we don't receive new data
                     let time_lhs = cap.time().clone() - active_post_period;
@@ -104,7 +110,7 @@ where
                     }
 
                     // push new timestamps
-                    for (new_timestamp, post_id) in all_timestamps.drain(..) {
+                    for (new_timestamp, post_id, person_id) in all_info.drain(..) {
                         // get current timestamp
                         if let Some(current_timestamp) = last_active_time
                             .entry(post_id)
@@ -115,13 +121,23 @@ where
                                 last_active_time.insert(post_id, Some(new_timestamp));
                             }
                         }
+
+                        interactions_by_post
+                            .entry(post_id)
+                            .or_insert(HashSet::new())
+                            .insert(person_id);
                     }
 
                     // go through all posts and output the active ones
                     let mut session = output.session(&cap);
                     for (post_id, option) in last_active_time.iter() {
                         if let Some(timestamp) = option {
-                            session.give(post_id.clone());
+                            let interactions = match interactions_by_post.get(&post_id) {
+                                Some(people) => people.len(),
+                                None => 0,
+                            };
+
+                            session.give((post_id.clone(), interactions));
                         }
                     }
                 })
