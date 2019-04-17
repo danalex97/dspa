@@ -1,17 +1,18 @@
-use crate::dto::common::Timestamped;
-use std::collections::HashMap;
 use timely::dataflow::channels::pact::ParallelizationContract;
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::{Scope, Stream};
 use timely::Data;
 
+use crate::dto::common::Timestamped;
 use crate::dto::comment::Comment;
 use crate::dto::post::Post;
 
 use crate::dsa::dsu::*;
 use crate::dsa::stash::*;
+
 use std::collections::binary_heap::BinaryHeap;
 use std::collections::HashSet;
+use std::collections::HashMap;
 
 pub trait LinkReplies<G, P, P2>
 where
@@ -40,8 +41,6 @@ fn add_edge(dsu: &mut Dsu<Node, Option<u32>>, parent: Node, child: Node) {
             assert!(child_value.is_none());
         }
     };
-    // println!("parent: {:?} {:?}", parent, dsu.key(parent));
-    // println!("child: {:?} {:?}", child, dsu.key(child));
 
     match dsu.value_mut(parent.clone()) {
         None => {}
