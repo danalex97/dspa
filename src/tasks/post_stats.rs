@@ -4,8 +4,8 @@ use crate::connection::producer::FIXED_BOUNDED_DELAY;
 use crate::operators::buffer::Buffer;
 use crate::operators::source::KafkaSource;
 
-use crate::operators::link_replies::LinkReplies;
 use crate::operators::active_posts::ActivePosts;
+use crate::operators::link_replies::LinkReplies;
 
 use crate::dto::comment::Comment;
 use crate::dto::common::Timestamped;
@@ -36,7 +36,7 @@ pub fn run() {
                 Exchange::new(|l: &Like| l.post_id as u64),
                 FIXED_BOUNDED_DELAY,
             );
-            
+
             let buffered_posts =
                 posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY);
 
@@ -47,14 +47,82 @@ pub fn run() {
                 FIXED_BOUNDED_DELAY,
             );
 
-            linked_comments
-                .active_post_ids(
-                    &buffered_likes,
+            let active_posts = linked_comments.active_post_ids(
+                &buffered_likes,
+                Pipeline,
+                Pipeline,
+                FIXED_BOUNDED_DELAY,
+                ACTIVE_POST_PERIOD,
+            );
+
+            let mut comment_counts: HashMap<u32, u64> = HashMap::new();
+            let mut reply_counts: HashMap<u32, u64> = HashMap::new();
+            let mut first_notified = false;
+            let mut active_post_snapshot = Vec::new();
+            let mut active_post_snapshot_timestamp = 0;
+            active_posts
+                .binary_notify(
+                    &linked_comments,
                     Pipeline,
                     Pipeline,
-                    FIXED_BOUNDED_DELAY,
-                    ACTIVE_POST_PERIOD,
-                ).inspect(|x| println!("{:?}", x));
+                    "Counts",
+                    None,
+                    move |p_input, c_input, output, notificator| {
+                        let mut c_data = Vec::new();
+                        c_input.for_each(|cap, input| {
+                            input.swap(&mut c_data);
+                            for comment in c_data.drain(..) {
+                                if !first_notified {
+                                    notificator.notify_at(cap.delayed(
+                                        &(cap.time() + COLLECTION_PERIOD - FIXED_BOUNDED_DELAY),
+                                    ));
+                                    first_notified = true;
+                                }
+                                match comment.reply_to_comment_id {
+                                    Some(_) => {
+                                        // Reply
+                                        let count = reply_counts
+                                            .entry(comment.reply_to_post_id.unwrap())
+                                            .or_insert(0);
+                                        *count += 1;
+                                    }
+                                    None => {
+                                        // Comment
+                                        let count = comment_counts
+                                            .entry(comment.reply_to_post_id.unwrap())
+                                            .or_insert(0);
+                                        *count += 1;
+                                    }
+                                }
+                            }
+                        });
+
+                        p_input.for_each(|cap, input| {
+                            if *cap.time() > active_post_snapshot_timestamp {
+                                active_post_snapshot_timestamp = cap.time().clone();
+                                active_post_snapshot.clear();
+                            }
+                            input.swap(&mut active_post_snapshot);
+                        });
+
+                        notificator.for_each(|cap, _, notificator| {
+                            notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
+                            let mut session = output.session(&cap);
+                            for post in active_post_snapshot.drain(..) {
+                                let replies = match reply_counts.get(&post) {
+                                    Some(count) => *count,
+                                    None => 0,
+                                };
+                                let comments = match comment_counts.get(&post) {
+                                    Some(count) => *count,
+                                    None => 0,
+                                };
+                                session.give((post, comments, replies));
+                            }
+                        })
+                    },
+                )
+                .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
         });
     })
     .unwrap();
