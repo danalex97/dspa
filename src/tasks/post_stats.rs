@@ -18,7 +18,10 @@ use timely::dataflow::operators::broadcast::Broadcast;
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::operators::Inspect;
 
+use std::collections::HashMap;
+
 const COLLECTION_PERIOD: usize = 1800; // seconds
+const ACTIVE_POST_PERIOD: usize = 43200; // seconds
 
 pub fn run() {
     timely::execute_from_args(std::env::args(), |worker| {
@@ -26,8 +29,6 @@ pub fn run() {
             let posts = scope.kafka_string_source::<Post>("posts".to_string());
             let comments = scope.kafka_string_source::<Comment>("comments".to_string());
             let likes = scope.kafka_string_source::<Like>("likes".to_string());
-
-            comments.inspect(|x| println!("{:?}", x.id));
 
             let buffered_likes = likes.buffer(
                 Exchange::new(|l: &Like| l.post_id as u64),
@@ -37,6 +38,8 @@ pub fn run() {
             let mut scheduled_first_notification = false;
             let mut comments_buffer: Stash<Comment> = Stash::new();
             let mut likes_buffer: Stash<Like> = Stash::new();
+
+            let mut last_active_time: HashMap<u32, Option<usize> > = HashMap::new();
 
             let buffered_posts =
                 posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY);
@@ -88,8 +91,42 @@ pub fn run() {
                                 .iter()
                                 .map(|c: &Comment| (c.timestamp, c.reply_to_post_id.unwrap()))
                                 .collect();
-                            session.give_vec(&mut likes_timestamps);
-                            session.give_vec(&mut comments_timestamps);
+
+                            // modify the deque
+                            let mut all_timestamps = likes_timestamps;
+                            all_timestamps.append(&mut comments_timestamps);
+                            let time_lhs = cap.time().clone() - ACTIVE_POST_PERIOD;
+
+                            // update all stale entries even if we don't receive new data
+                            for option in last_active_time.values_mut() {
+                                // pop elements outside my window in the lhs
+                                if let Some(timestamp) = option {
+                                    // the interval is non-inclusive in the lhs
+                                    if *timestamp <= time_lhs {
+                                        *option = None;
+                                    }
+                                }
+                            }
+
+                            // push new data
+                            for (new_timestamp, post_id) in all_timestamps.drain(..) {
+                                // get current timestamp
+                                if let Some(current_timestamp) = last_active_time
+                                        .entry(post_id)
+                                        .or_insert(Some(new_timestamp)) {
+                                    // and if I have a better one, update it
+                                    if new_timestamp > *current_timestamp {
+                                        last_active_time.insert(post_id, Some(new_timestamp));
+                                    }
+                                }
+                            }
+
+                            // go through all posts and output the active ones
+                            for (post_id, option) in last_active_time.iter() {
+                                if let Some(timestamp) = option {
+                                    session.give(post_id.clone());
+                                }
+                            }
                         })
                     },
                 )
