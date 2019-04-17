@@ -3,8 +3,8 @@ use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::{Scope, Stream};
 use timely::Data;
 
-use crate::dto::common::Timestamped;
 use crate::dto::comment::Comment;
+use crate::dto::common::Timestamped;
 use crate::dto::like::Like;
 
 use crate::dsa::stash::*;
@@ -43,7 +43,7 @@ where
     ) -> Stream<G, u32> {
         let mut comments_buffer: Stash<Comment> = Stash::new();
         let mut likes_buffer: Stash<Like> = Stash::new();
-        let mut last_active_time: HashMap<u32, Option<usize> > = HashMap::new();
+        let mut last_active_time: HashMap<u32, Option<usize>> = HashMap::new();
 
         self.binary_notify(
             &likes,
@@ -76,8 +76,7 @@ where
 
                 notificator.for_each(|cap, _, _| {
                     // get timestamps for likes and comments
-                    let comments =
-                        comments_buffer.extract(delay, *cap.time());
+                    let comments = comments_buffer.extract(delay, *cap.time());
                     let likes = likes_buffer.extract(delay, *cap.time());
                     let mut likes_timestamps: Vec<_> = likes
                         .iter()
@@ -108,8 +107,9 @@ where
                     for (new_timestamp, post_id) in all_timestamps.drain(..) {
                         // get current timestamp
                         if let Some(current_timestamp) = last_active_time
-                                .entry(post_id)
-                                .or_insert(Some(new_timestamp)) {
+                            .entry(post_id)
+                            .or_insert(Some(new_timestamp))
+                        {
                             // and if I have a better one, update it
                             if new_timestamp > *current_timestamp {
                                 last_active_time.insert(post_id, Some(new_timestamp));

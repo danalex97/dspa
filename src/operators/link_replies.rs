@@ -3,16 +3,16 @@ use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::{Scope, Stream};
 use timely::Data;
 
-use crate::dto::common::Timestamped;
 use crate::dto::comment::Comment;
+use crate::dto::common::Timestamped;
 use crate::dto::post::Post;
 
 use crate::dsa::dsu::*;
 use crate::dsa::stash::*;
 
 use std::collections::binary_heap::BinaryHeap;
-use std::collections::HashSet;
 use std::collections::HashMap;
+use std::collections::HashSet;
 
 pub trait LinkReplies<G, P, P2>
 where
