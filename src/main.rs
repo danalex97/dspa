@@ -53,6 +53,6 @@ fn main() {
         who_to_follow::run();
     }
 
-    load::run(Some(100));
+    load::run(Some(1000));
     who_to_follow::run();
 }

@@ -21,8 +21,9 @@ use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::operators::Inspect;
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 
-const COLLECTION_PERIOD: usize = 1800; // seconds
+const COLLECTION_PERIOD: usize = 60 * 60; // seconds
 const ACTIVE_POST_PERIOD: usize = 4 * 60 * 60; // seconds
 
 pub fn run() {
@@ -55,8 +56,15 @@ pub fn run() {
                 ACTIVE_POST_PERIOD,
             );
 
-            let mut first_notified_engaged = false;
-            let mut engaged = HashMap::new();
+            let people_of_interest: Vec<u32> = vec![129, 986, 618, 296, 814, 379, 441, 655, 836, 929];
+
+
+
+            let mut first_notified = false;
+            let mut post_info = HashMap::new(); // map: post_id -> (forum, tags)
+            // let mut people_engaged_with_forum = HashMap::new(); // map: forum -> set[people]
+            // let mut people_engaged_with_tag = HashMap::new(); // map: tag -> set[people]
+            // vector of (post_id, interacting_users)
             let mut active_post_snapshot = Vec::new();
             active_posts
                 .binary_notify(
@@ -66,9 +74,58 @@ pub fn run() {
                     "WhoToFollow",
                     None,
                     move |ap_input, bp_input, output, notificator| {
+                        // keep all bp information from beginning of time
+                        let mut bp_data = Vec::new();
+                        bp_input.for_each(|cap, input| {
+                            input.swap(&mut bp_data);
+                            for post in bp_data.drain(..) {
+                                post_info
+                                    .entry(post.id)
+                                    .or_insert((post.forum_id, post.tags));
+                            }
+                            if !first_notified {
+                                notificator.notify_at(cap.delayed(
+                                    &(cap.time() + COLLECTION_PERIOD - FIXED_BOUNDED_DELAY),
+                                ));
+                                first_notified = true;
+                            }
+                        });
+
+                        // keep the latest snapshot that we received
+                        ap_input.for_each(|cap, input| {
+                            input.swap(&mut active_post_snapshot);
+                        });
+
+                        // do the actual computation at each notification
+                        notificator.for_each(|cap, _, notificator| {
+                            notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
+
+                            // the posts that our users are engaged with
+                            let mut posts_of_interest = HashMap::new();
+                            // you have the guarantee that we will have a new snapshot before the
+                            // next notification, so we can drain it
+                            for (post_id, engaged_people) in active_post_snapshot.drain(..) {
+                                // println!("{:?} {:?}", post_id, engaged_people);
+                                for person_id in engaged_people {
+                                    if people_of_interest.contains(&person_id) {
+                                        posts_of_interest
+                                            .entry(person_id)
+                                            .or_insert(vec![])
+                                            .push(post_id);
+                                    }
+                                }
+                            }
+
+                            if posts_of_interest.len() > 0 {
+                                println!("{:?}", posts_of_interest);
+                            }
+
+                            let mut session = output.session(&cap);
+                            session.give(1);
+                        })
                     }
-                )
-                .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
+                );
+                // .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
         });
     })
         .unwrap();
