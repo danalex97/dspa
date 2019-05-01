@@ -12,6 +12,7 @@ mod tasks;
 use clap::{App, Arg, SubCommand};
 use tasks::load;
 use tasks::post_stats;
+use crate::tasks::who_to_follow;
 
 fn main() {
     let matches = App::new("DSPA")
@@ -29,11 +30,7 @@ fn main() {
         )
         .subcommand(
             SubCommand::with_name("who-to-follow")
-                .about("Friend recommendation service.")
-                .arg(
-                    Arg::with_name("static-data")
-                        .help("Path to directory containing static data")
-                )
+                .about("Friend recommendation service."),
         )
         .get_matches();
 
@@ -51,14 +48,11 @@ fn main() {
         post_stats::run();
     }
 
-    if let ("who-to-follow", Some(args)) = matches.subcommand() {
-        let path = match value_t!(args.value_of("static-data"), String) {
-            Ok(path) => path,
-            Err(_) => panic!(),
-        };
+    if let ("who-to-follow", _) = matches.subcommand() {
         // TODO: load static data from path
+        who_to_follow::run();
     }
 
     load::run(Some(100));
-    post_stats::run();
+    who_to_follow::run();
 }
