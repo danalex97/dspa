@@ -159,23 +159,72 @@ pub fn run() {
                                 for friend in person_map.get(&interest_person_id).unwrap().friends.clone() {
                                     candidate_friends.remove(&friend);
                                 }
+                                candidate_friends.remove(&interest_person_id);
 
                                 // Find the forums your friends like
                                 let mut candidate_friends_forums = HashMap::new();
-                                for candidate in candidate_friends {
-                                    candidate_friends_forums.insert(candidate,
-                                    person_forums.get(&candidate).unwrap()
-                                        .intersection(person_forums.get(&interest_person_id).unwrap()).collect::<Vec<_>>().len());
+                                for candidate in &candidate_friends {
+                                    candidate_friends_forums.insert(
+                                        candidate,
+                                        person_forums.get(&candidate).unwrap()
+                                            .intersection(person_forums.get(&interest_person_id).unwrap())
+                                            .collect::<Vec<_>>().len());
                                 }
-                                println!("{:?}", candidate_friends_forums);
+
+                                // Find the number of common friends
+                                let mut candidate_friends_mutual_friends = HashMap::new();
+                                for candidate in &candidate_friends {
+                                    let mut friends1 = person_map.get(&interest_person_id).unwrap().friends.clone();
+                                    let mut friends2 = match person_map.get(&candidate) {
+                                        Some(candidate) => candidate.friends.clone(),
+                                        None            => Vec::new(),
+                                    };
+
+                                    let friends1_set: HashSet<u32> = HashSet::from_iter(friends1.drain(..));
+                                    let friends2_set: HashSet<u32> = HashSet::from_iter(friends2.drain(..));
+
+                                    candidate_friends_mutual_friends.insert(
+                                        candidate,
+                                        friends1_set.intersection(&friends2_set).collect::<Vec<_>>().len());
+                                }
+
+                                // find top friends
+                                let mut candidate_metrics = HashMap::new();
+                                for candidate in &candidate_friends {
+                                    // compute metric
+                                    let metric =
+                                        candidate_friends_forums.get(&candidate).unwrap() +
+                                        candidate_friends_mutual_friends.get(&candidate).unwrap();
+
+                                    candidate_metrics.insert(candidate, metric);
+                                }
+
+                                let mut recommendations = Vec::new();
+                                for i in 0..5 {
+                                    let mut best_candidate = None;
+                                    let mut best_metric = 0;
+                                    for (candidate, metric) in &candidate_metrics {
+                                        if *metric > best_metric {
+                                            best_metric    = *metric;
+                                            best_candidate = Some(*candidate);
+                                        }
+                                    }
+
+                                    if let Some(candidate) = best_candidate {
+                                        candidate_metrics.remove(&candidate);
+                                        recommendations.push(*candidate);
+                                    }
+                                }
+
+
+                                let mut session = output.session(&cap);
+                                session.give((interest_person_id, recommendations));
                             }
 
-                            let mut session = output.session(&cap);
-                            session.give(1);
                         })
                     }
-                );
-            // .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
+                )
+                .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
         });
     })
         .unwrap();
