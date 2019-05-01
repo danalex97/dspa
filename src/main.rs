@@ -27,6 +27,14 @@ fn main() {
             SubCommand::with_name("post-stats")
                 .about("Active posts(12 hours) statistics updated every 30 minutes."),
         )
+        .subcommand(
+            SubCommand::with_name("who-to-follow")
+                .about("Friend recommendation service.")
+                .arg(
+                    Arg::with_name("static-data")
+                        .help("Path to directory containing static data")
+                )
+        )
         .get_matches();
 
     if let ("load", Some(args)) = matches.subcommand() {
@@ -41,6 +49,14 @@ fn main() {
 
     if let ("post-stats", _) = matches.subcommand() {
         post_stats::run();
+    }
+
+    if let ("who-to-follow", Some(args)) = matches.subcommand() {
+        let path = match value_t!(args.value_of("static-data"), String) {
+            Ok(path) => path,
+            Err(_) => panic!(),
+        };
+        // TODO: load static data from path
     }
 
     load::run(Some(100));
