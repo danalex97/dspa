@@ -19,6 +19,7 @@ pub struct Person {
     pub creation_date: DateTime<FixedOffset>,
     pub location_ip: std::net::Ipv4Addr,
     pub browser_used: Browser,
+    pub friends: Vec<u32>,
 }
 
 impl Importable<Person> for Person {
@@ -41,10 +42,17 @@ impl Importable<Person> for Person {
             creation_date,
             location_ip,
             browser_used,
+            friends: vec![],
         })
     }
 
     fn id(&self) -> Option<u32> {
         Some(self.id)
+    }
+}
+
+impl Person {
+    pub fn add_friend(&mut self, friend: u32) {
+        self.friends.push(friend);
     }
 }
