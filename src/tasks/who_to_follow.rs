@@ -13,6 +13,9 @@ use crate::dto::like::Like;
 use crate::dto::post::Post;
 
 use crate::dsa::stash::*;
+use crate::dto::parse::*;
+use crate::dto::forum::Forum;
+use crate::connection::import::csv_to_map;
 
 use timely::dataflow::channels::pact::Exchange;
 use timely::dataflow::channels::pact::Pipeline;
@@ -22,6 +25,9 @@ use timely::dataflow::operators::Inspect;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+
+const FORUM_PATH: &str = "data/1k-users-sorted/tables/forum.csv";
+const FORUM_MEMEBERS_PATH: &str = "data/1k-users-sorted/tables/forum_hasMember_person.csv";
 
 const COLLECTION_PERIOD: usize = 60 * 60; // seconds
 const ACTIVE_POST_PERIOD: usize = 4 * 60 * 60; // seconds
@@ -58,7 +64,9 @@ pub fn run() {
 
             let people_of_interest: Vec<u32> = vec![129, 986, 618, 296, 814, 379, 441, 655, 836, 929];
 
-
+            // getting the forum map
+            let mut forum_map = csv_to_map::<Forum>(FORUM_PATH);
+            parse_forum_member_csv(FORUM_MEMEBERS_PATH, &mut forum_map);
 
             let mut first_notified = false;
             let mut post_info = HashMap::new(); // map: post_id -> (forum, tags)
@@ -101,7 +109,7 @@ pub fn run() {
                             notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
 
                             // the posts that our users are engaged with
-                            let mut posts_of_interest = HashMap::new();
+                            let mut posts_of_interest = HashMap::new(); // map: user -> set[posts]
                             // you have the guarantee that we will have a new snapshot before the
                             // next notification, so we can drain it
                             for (post_id, engaged_people) in active_post_snapshot.drain(..) {
@@ -110,14 +118,30 @@ pub fn run() {
                                     if people_of_interest.contains(&person_id) {
                                         posts_of_interest
                                             .entry(person_id)
-                                            .or_insert(vec![])
-                                            .push(post_id);
+                                            .or_insert(HashSet::new())
+                                            .insert(post_id);
                                     }
                                 }
                             }
 
-                            if posts_of_interest.len() > 0 {
-                                println!("{:?}", posts_of_interest);
+                            for (interest_person_id, post_set) in posts_of_interest {
+                                // find all the unique forums this person is interested in
+                                let mut forum_set = HashSet::new();
+                                for post_id in post_set {
+                                    let (forum, _) = post_info.get(&post_id).unwrap();
+                                    forum_set.insert(forum);
+                                }
+
+                                let mut candidate_friends = HashSet::new();
+                                for forum_id in forum_set {
+                                    if let Some(forum) = forum_map.get(forum_id) {
+                                        for forum_member in forum.member_ids.clone() {
+                                            candidate_friends.insert(forum_member);
+                                        }
+                                    }
+                                }
+
+                                // [TODO] 
                             }
 
                             let mut session = output.session(&cap);
