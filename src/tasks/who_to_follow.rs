@@ -25,9 +25,13 @@ use timely::dataflow::operators::Inspect;
 
 use std::collections::HashMap;
 use std::collections::HashSet;
+use std::iter::FromIterator;
+use crate::dto::person::Person;
 
 const FORUM_PATH: &str = "data/1k-users-sorted/tables/forum.csv";
-const FORUM_MEMEBERS_PATH: &str = "data/1k-users-sorted/tables/forum_hasMember_person.csv";
+const FORUM_MEMBERS_PATH: &str = "data/1k-users-sorted/tables/forum_hasMember_person.csv";
+const PERSON_PATH: &str = "data/1k-users-sorted/tables/person.csv";
+const PERSON_FRIEND_PATH: &str = "data/1k-users-sorted/tables/person_knows_person.csv";
 
 const COLLECTION_PERIOD: usize = 60 * 60; // seconds
 const ACTIVE_POST_PERIOD: usize = 4 * 60 * 60; // seconds
@@ -66,7 +70,17 @@ pub fn run() {
 
             // getting the forum map
             let mut forum_map = csv_to_map::<Forum>(FORUM_PATH);
-            parse_forum_member_csv(FORUM_MEMEBERS_PATH, &mut forum_map);
+            parse_forum_member_csv(FORUM_MEMBERS_PATH, &mut forum_map);
+
+            let mut person_map = csv_to_map::<Person>(PERSON_PATH);
+            parse_person_friends(PERSON_FRIEND_PATH, &mut person_map);
+
+            let mut person_forums: HashMap<u32, HashSet<u32>> = HashMap::new();
+            for (forum_id, forum) in &forum_map {
+                for member in &forum.member_ids {
+                    person_forums.entry(*member).or_insert(HashSet::new()).insert(*forum_id);
+                }
+            }
 
             let mut first_notified = false;
             let mut post_info = HashMap::new(); // map: post_id -> (forum, tags)
@@ -141,7 +155,19 @@ pub fn run() {
                                     }
                                 }
 
-                                // [TODO] 
+                                // Filter out friends
+                                for friend in person_map.get(&interest_person_id).unwrap().friends.clone() {
+                                    candidate_friends.remove(&friend);
+                                }
+
+                                // Find the forums your friends like
+                                let mut candidate_friends_forums = HashMap::new();
+                                for candidate in candidate_friends {
+                                    candidate_friends_forums.insert(candidate,
+                                    person_forums.get(&candidate).unwrap()
+                                        .intersection(person_forums.get(&interest_person_id).unwrap()).collect::<Vec<_>>().len());
+                                }
+                                println!("{:?}", candidate_friends_forums);
                             }
 
                             let mut session = output.session(&cap);
@@ -149,7 +175,7 @@ pub fn run() {
                         })
                     }
                 );
-                // .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
+            // .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
         });
     })
         .unwrap();
