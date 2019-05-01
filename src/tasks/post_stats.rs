@@ -67,6 +67,7 @@ pub fn run() {
                     None,
                     move |p_input, c_input, output, notificator| {
                         // only used for synchonization
+                        // TODO: check if needed
                         let mut c_data = Vec::new();
                         c_input.for_each(|cap, input| {
                             input.swap(&mut c_data);
@@ -83,11 +84,11 @@ pub fn run() {
                         // actual processing
                         p_input.for_each(|cap, input| {
                             input.swap(&mut active_post_snapshot);
-                            for (post_id, num_engaged) in active_post_snapshot.clone() {
+                            for (post_id, engaged_people) in active_post_snapshot.clone() {
                                 let mut entry = engaged
                                     .entry(post_id)
-                                    .or_insert(num_engaged);
-                                *entry = num_engaged;
+                                    .or_insert(engaged_people.len());
+                                *entry = engaged_people.len();
                             }
                         });
 

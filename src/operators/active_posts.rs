@@ -24,7 +24,7 @@ where
         l_pact: P2,
         delay: usize,
         active_post_period: usize,
-    ) -> Stream<G, (u32, usize)>;
+    ) -> Stream<G, (u32, HashSet<u32>)>;
 }
 
 // PRE: likes and comments are buffered
@@ -42,7 +42,7 @@ where
         l_pact: P2,
         delay: usize,
         active_post_period: usize,
-    ) -> Stream<G, (u32, usize)> {
+    ) -> Stream<G, (u32, HashSet<u32>)> {
         let mut comments_buffer: Stash<Comment> = Stash::new();
         let mut likes_buffer: Stash<Like> = Stash::new();
         let mut last_active_time: HashMap<u32, Option<usize>> = HashMap::new();
@@ -128,13 +128,15 @@ where
                             .insert(person_id);
                     }
 
-                    // go through all posts and output the active ones
+                    // go through all posts and output the active ones; the boundary of the data
+                    // stream is before the actual capability, possibly meaning we miss some data
+                    // between notifications.
                     let mut session = output.session(&cap);
                     for (post_id, option) in last_active_time.iter() {
                         if let Some(timestamp) = option {
                             let interactions = match interactions_by_post.get(&post_id) {
-                                Some(people) => people.len(),
-                                None => 0,
+                                Some(people) => people.clone(),
+                                None => HashSet::new(),
                             };
 
                             session.give((post_id.clone(), interactions));
