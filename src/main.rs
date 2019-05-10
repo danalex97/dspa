@@ -9,10 +9,8 @@ mod dto;
 mod operators;
 mod tasks;
 
-use crate::tasks::who_to_follow;
 use clap::{App, Arg, SubCommand};
-use tasks::load;
-use tasks::post_stats;
+use tasks::{load, post_stats, who_to_follow, unusual_activity};
 
 fn main() {
     let matches = App::new("DSPA")
@@ -51,5 +49,5 @@ fn main() {
     }
 
     load::run(Some(1000));
-    who_to_follow::run();
+    unusual_activity::run();
 }
