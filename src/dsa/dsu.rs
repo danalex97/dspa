@@ -2,6 +2,7 @@ use std::collections::HashMap;
 use std::fmt::Debug;
 use std::hash::Hash;
 
+#[allow(dead_code)]
 struct Node<K, V> {
     parent: usize,
     key: K,
@@ -13,6 +14,7 @@ pub struct Dsu<K: Hash + Eq + Clone + Debug, V> {
     data: Vec<Node<K, V>>,
 }
 
+#[allow(dead_code)]
 impl<K: Hash + Eq + Clone + Debug, V> Dsu<K, V> {
     pub fn new() -> Dsu<K, V> {
         Dsu {

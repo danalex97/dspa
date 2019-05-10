@@ -12,14 +12,9 @@ use timely::dataflow::scopes::Scope;
 use timely::dataflow::Stream;
 use timely::Data;
 
-use futures::stream::Stream as FutureStream;
-use rdkafka::client::ClientContext;
-use rdkafka::config::{ClientConfig, RDKafkaLogLevel};
-use rdkafka::consumer::stream_consumer::StreamConsumer;
-use rdkafka::consumer::{CommitMode, Consumer, ConsumerContext, Rebalance};
-use rdkafka::error::KafkaResult;
-use rdkafka::message::{Headers, Message};
-use rdkafka::util::get_rdkafka_version;
+use rdkafka::config::ClientConfig;
+use rdkafka::consumer::Consumer;
+use rdkafka::message::Message;
 
 use self::rdkafka::consumer::BaseConsumer;
 use csv::StringRecord;
@@ -32,16 +27,6 @@ pub trait KafkaSource<G: Scope> {
     ) -> Stream<G, D>;
 }
 
-struct CustomContext;
-
-impl ClientContext for CustomContext {}
-
-impl ConsumerContext for CustomContext {
-    fn pre_rebalance(&self, _: &Rebalance) {}
-    fn post_rebalance(&self, _: &Rebalance) {}
-    fn commit_callback(&self, _: KafkaResult<()>, _: *mut rdkafka_sys::RDKafkaTopicPartitionList) {}
-}
-
 impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
     fn kafka_string_source<D: Importable<D> + Data + Timestamped>(
         &self,
@@ -49,7 +34,6 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
     ) -> Stream<G, D> {
         // Extract Kafka topic.
         let brokers = "localhost:9092";
-        let context = CustomContext;
 
         // Create Kafka consumer configuration.
         let mut consumer_config = ClientConfig::new();
@@ -63,14 +47,6 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
             .set("bootstrap.servers", &brokers);
 
         // Create a Kafka consumer.
-        /*
-        let consumer: StreamConsumer<CustomContext> = consumer_config
-            .create_with_context(context)
-            .expect("Couldn't create consumer");
-        consumer
-            .subscribe(&[&topic])
-            .expect("Failed to subscribe to topic");
-            */
         let consumer: BaseConsumer = consumer_config.create().unwrap();
         consumer.subscribe(&[&topic]).expect("Failed to subscribe");
 
@@ -85,7 +61,7 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
                         Err(_) => println!("Error while reading from stream."),
                         Ok(m) => match m.payload_view::<str>() {
                             None => {}
-                            Some(Err(e)) => {}
+                            Some(Err(_)) => {}
                             Some(Ok(text)) => {
                                 // process payload
                                 let v: Vec<&str> = text.split("|").collect();

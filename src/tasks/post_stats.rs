@@ -8,11 +8,8 @@ use crate::operators::active_posts::ActivePosts;
 use crate::operators::link_replies::LinkReplies;
 
 use crate::dto::comment::Comment;
-use crate::dto::common::Timestamped;
 use crate::dto::like::Like;
 use crate::dto::post::Post;
-
-use crate::dsa::stash::*;
 
 use timely::dataflow::channels::pact::Exchange;
 use timely::dataflow::channels::pact::Pipeline;
@@ -67,11 +64,11 @@ pub fn run() {
                     None,
                     move |p_input, c_input, output, notificator| {
                         // only used for synchonization
-                        // TODO: check if needed
+                        // [TODO]: check if needed
                         let mut c_data = Vec::new();
                         c_input.for_each(|cap, input| {
                             input.swap(&mut c_data);
-                            for comment in c_data.drain(..) {
+                            for _ in c_data.drain(..) {
                                 if !first_notified_engaged {
                                     notificator.notify_at(cap.delayed(
                                         &(cap.time() + 2 * COLLECTION_PERIOD - FIXED_BOUNDED_DELAY),
@@ -82,10 +79,10 @@ pub fn run() {
                         });
 
                         // actual processing
-                        p_input.for_each(|cap, input| {
+                        p_input.for_each(|_, input| {
                             input.swap(&mut active_post_snapshot);
                             for (post_id, engaged_people) in active_post_snapshot.clone() {
-                                let mut entry =
+                                let entry =
                                     engaged.entry(post_id).or_insert(engaged_people.len());
                                 *entry = engaged_people.len();
                             }
@@ -149,7 +146,7 @@ pub fn run() {
                             }
                         });
 
-                        p_input.for_each(|cap, input| {
+                        p_input.for_each(|_, input| {
                             input.swap(&mut active_post_snapshot);
                         });
 

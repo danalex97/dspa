@@ -1,7 +1,6 @@
 use timely::dataflow::channels::pact::ParallelizationContract;
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::{Scope, Stream};
-use timely::Data;
 
 use crate::dto::comment::Comment;
 use crate::dto::common::Timestamped;
@@ -84,7 +83,7 @@ where
                     let comments = comments_buffer.extract(delay, *cap.time());
                     let likes = likes_buffer.extract(delay, *cap.time());
 
-                    let mut likes: Vec<_> = likes
+                    let likes: Vec<_> = likes
                         .iter()
                         .map(|l: &Like| (l.timestamp, l.post_id, l.person_id))
                         .collect();
@@ -133,7 +132,7 @@ where
                     // between notifications.
                     let mut session = output.session(&cap);
                     for (post_id, option) in last_active_time.iter() {
-                        if let Some(timestamp) = option {
+                        if let Some(_timestamp) = option {
                             let interactions = match interactions_by_post.get(&post_id) {
                                 Some(people) => people.clone(),
                                 None => HashSet::new(),

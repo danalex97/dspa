@@ -8,12 +8,10 @@ use crate::operators::active_posts::ActivePosts;
 use crate::operators::link_replies::LinkReplies;
 
 use crate::dto::comment::Comment;
-use crate::dto::common::Timestamped;
 use crate::dto::like::Like;
 use crate::dto::post::Post;
 
 use crate::connection::import::csv_to_map;
-use crate::dsa::stash::*;
 use crate::dto::forum::Forum;
 use crate::dto::parse::*;
 
@@ -35,6 +33,7 @@ const PERSON_FRIEND_PATH: &str = "data/1k-users-sorted/tables/person_knows_perso
 
 const COLLECTION_PERIOD: usize = 60 * 60; // seconds
 const ACTIVE_POST_PERIOD: usize = 4 * 60 * 60; // seconds
+const RECOMMENDATIONS: usize = 5;
 
 pub fn run() {
     timely::execute_from_args(std::env::args(), |worker| {
@@ -115,7 +114,7 @@ pub fn run() {
                         });
 
                         // keep the latest snapshot that we received
-                        ap_input.for_each(|cap, input| {
+                        ap_input.for_each(|_, input| {
                             input.swap(&mut active_post_snapshot);
                         });
 
@@ -219,7 +218,7 @@ pub fn run() {
                                 }
 
                                 let mut recommendations = Vec::new();
-                                for i in 0..5 {
+                                for _ in 0..RECOMMENDATIONS {
                                     let mut best_candidate = None;
                                     let mut best_metric = 0;
                                     for (candidate, metric) in &candidate_metrics {

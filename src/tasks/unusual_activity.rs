@@ -8,11 +8,8 @@ use crate::operators::buffer::Buffer;
 use crate::operators::source::KafkaSource;
 use crate::util::Plotter;
 
-use std::cmp::min;
 use std::cmp::Ordering::Equal;
-use std::collections::HashMap;
 use std::collections::HashSet;
-use std::f64::NAN;
 use std::iter::FromIterator;
 use std::string::ToString;
 
@@ -67,7 +64,7 @@ fn compute_centers(old_centers: &Vec<Point>, points: &Vec<Point>) -> Vec<Point> 
         ));
     }
 
-    for i in 0..20 {
+    loop {
         let clusters = compute_clusters(&centers, &points);
 
         let mut new_centers = vec![];
@@ -84,18 +81,16 @@ fn compute_centers(old_centers: &Vec<Point>, points: &Vec<Point>) -> Vec<Point> 
         }
 
         let mut tot_diff = 0f64;
-        for i in 0..NUM_CLUSTERS {
+        for i in 0..new_centers.len() {
             tot_diff += sqr_dist(&new_centers[i], &centers[i]);
         }
-
         if tot_diff < EPS {
             break;
         }
-        for i in 0..NUM_CLUSTERS {
-            centers[i] = new_centers[i];
-        }
+
+        centers = new_centers;
+        centers.retain(|(x, y)| !x.is_nan() && !y.is_nan());
     }
-    centers.retain(|(x, y)| *x != NAN && *y != NAN);
 
     // sort centers by coverage
     let mut ord: Vec<usize> = (0..centers.len()).collect();
@@ -162,7 +157,7 @@ fn get_data_point(text: &String) -> Option<Point> {
 
     // remove punctuation
     for sep in "?!.,;:".chars() {
-        alpha_text.replace(sep, " ");
+        alpha_text = alpha_text.replace(sep, " ");
     }
 
     // keep only alpha text
@@ -181,8 +176,6 @@ fn get_data_point(text: &String) -> Option<Point> {
     }
 
     let unique_words: HashSet<_> = HashSet::from_iter(words.iter().cloned());
-    let uniq_len = unique_words.len();
-
     let mut unique_bigrams = HashSet::new();
     for i in 0..words.len() - 2 {
         unique_bigrams.insert(words[i].clone() + " " + &words[i + 1].clone());
@@ -241,9 +234,9 @@ pub fn run() {
                             notificator.for_each(|cap, _, notificator| {
                                 notificator.notify_at(cap.delayed(&(cap.time() + NOTIFY_PERIOD)));
 
-                                let mut possible_outliers =
+                                let possible_outliers =
                                     stash.extract(NOTIFY_PERIOD, *cap.time());
-                                for (point, post) in possible_outliers.iter() {
+                                for (point, _) in possible_outliers.iter() {
                                     points.push(*point);
                                 }
 
