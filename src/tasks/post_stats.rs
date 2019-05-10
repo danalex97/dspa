@@ -85,15 +85,15 @@ pub fn run() {
                         p_input.for_each(|cap, input| {
                             input.swap(&mut active_post_snapshot);
                             for (post_id, engaged_people) in active_post_snapshot.clone() {
-                                let mut entry = engaged
-                                    .entry(post_id)
-                                    .or_insert(engaged_people.len());
+                                let mut entry =
+                                    engaged.entry(post_id).or_insert(engaged_people.len());
                                 *entry = engaged_people.len();
                             }
                         });
 
                         notificator.for_each(|cap, _, notificator| {
-                            notificator.notify_at(cap.delayed(&(cap.time() + 2 * COLLECTION_PERIOD)));
+                            notificator
+                                .notify_at(cap.delayed(&(cap.time() + 2 * COLLECTION_PERIOD)));
 
                             let mut session = output.session(&cap);
                             for (post_id, _) in active_post_snapshot.drain(..) {
@@ -104,7 +104,7 @@ pub fn run() {
                                 session.give((post_id, engaged_users));
                             }
                         });
-                    }
+                    },
                 )
                 .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
 

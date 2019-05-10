@@ -12,10 +12,10 @@ use crate::dto::common::Timestamped;
 use crate::dto::like::Like;
 use crate::dto::post::Post;
 
-use crate::dsa::stash::*;
-use crate::dto::parse::*;
-use crate::dto::forum::Forum;
 use crate::connection::import::csv_to_map;
+use crate::dsa::stash::*;
+use crate::dto::forum::Forum;
+use crate::dto::parse::*;
 
 use timely::dataflow::channels::pact::Exchange;
 use timely::dataflow::channels::pact::Pipeline;
@@ -23,10 +23,10 @@ use timely::dataflow::operators::broadcast::Broadcast;
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::operators::Inspect;
 
+use crate::dto::person::Person;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use crate::dto::person::Person;
 
 const FORUM_PATH: &str = "data/1k-users-sorted/tables/forum.csv";
 const FORUM_MEMBERS_PATH: &str = "data/1k-users-sorted/tables/forum_hasMember_person.csv";
@@ -66,7 +66,8 @@ pub fn run() {
                 ACTIVE_POST_PERIOD,
             );
 
-            let people_of_interest: Vec<u32> = vec![129, 986, 618, 296, 814, 379, 441, 655, 836, 929];
+            let people_of_interest: Vec<u32> =
+                vec![129, 986, 618, 296, 814, 379, 441, 655, 836, 929];
 
             // getting the forum map
             let mut forum_map = csv_to_map::<Forum>(FORUM_PATH);
@@ -156,7 +157,9 @@ pub fn run() {
                                 }
 
                                 // Filter out friends
-                                for friend in person_map.get(&interest_person_id).unwrap().friends.clone() {
+                                for friend in
+                                    person_map.get(&interest_person_id).unwrap().friends.clone()
+                                {
                                     candidate_friends.remove(&friend);
                                 }
                                 candidate_friends.remove(&interest_person_id);
@@ -166,35 +169,50 @@ pub fn run() {
                                 for candidate in &candidate_friends {
                                     candidate_friends_forums.insert(
                                         candidate,
-                                        person_forums.get(&candidate).unwrap()
-                                            .intersection(person_forums.get(&interest_person_id).unwrap())
-                                            .collect::<Vec<_>>().len());
+                                        person_forums
+                                            .get(&candidate)
+                                            .unwrap()
+                                            .intersection(
+                                                person_forums.get(&interest_person_id).unwrap(),
+                                            )
+                                            .collect::<Vec<_>>()
+                                            .len(),
+                                    );
                                 }
 
                                 // Find the number of common friends
                                 let mut candidate_friends_mutual_friends = HashMap::new();
                                 for candidate in &candidate_friends {
-                                    let mut friends1 = person_map.get(&interest_person_id).unwrap().friends.clone();
+                                    let mut friends1 = person_map
+                                        .get(&interest_person_id)
+                                        .unwrap()
+                                        .friends
+                                        .clone();
                                     let mut friends2 = match person_map.get(&candidate) {
                                         Some(candidate) => candidate.friends.clone(),
-                                        None            => Vec::new(),
+                                        None => Vec::new(),
                                     };
 
-                                    let friends1_set: HashSet<u32> = HashSet::from_iter(friends1.drain(..));
-                                    let friends2_set: HashSet<u32> = HashSet::from_iter(friends2.drain(..));
+                                    let friends1_set: HashSet<u32> =
+                                        HashSet::from_iter(friends1.drain(..));
+                                    let friends2_set: HashSet<u32> =
+                                        HashSet::from_iter(friends2.drain(..));
 
                                     candidate_friends_mutual_friends.insert(
                                         candidate,
-                                        friends1_set.intersection(&friends2_set).collect::<Vec<_>>().len());
+                                        friends1_set
+                                            .intersection(&friends2_set)
+                                            .collect::<Vec<_>>()
+                                            .len(),
+                                    );
                                 }
 
                                 // find top friends
                                 let mut candidate_metrics = HashMap::new();
                                 for candidate in &candidate_friends {
                                     // compute metric
-                                    let metric =
-                                        candidate_friends_forums.get(&candidate).unwrap() +
-                                        candidate_friends_mutual_friends.get(&candidate).unwrap();
+                                    let metric = candidate_friends_forums.get(&candidate).unwrap()
+                                        + candidate_friends_mutual_friends.get(&candidate).unwrap();
 
                                     candidate_metrics.insert(candidate, metric);
                                 }
@@ -205,7 +223,7 @@ pub fn run() {
                                     let mut best_metric = 0;
                                     for (candidate, metric) in &candidate_metrics {
                                         if *metric > best_metric {
-                                            best_metric    = *metric;
+                                            best_metric = *metric;
                                             best_candidate = Some(*candidate);
                                         }
                                     }
@@ -216,16 +234,14 @@ pub fn run() {
                                     }
                                 }
 
-
                                 let mut session = output.session(&cap);
                                 session.give((interest_person_id, recommendations));
                             }
-
                         })
-                    }
+                    },
                 )
                 .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
         });
     })
-        .unwrap();
+    .unwrap();
 }

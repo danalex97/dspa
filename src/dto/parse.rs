@@ -1,6 +1,6 @@
 use crate::dto::forum::Forum;
-use std::collections::HashMap;
 use crate::dto::person::Person;
+use std::collections::HashMap;
 
 pub fn parse_forum_member_csv(file: &str, forum_map: &mut HashMap<u32, Forum>) {
     let mut rdr = csv::ReaderBuilder::new()

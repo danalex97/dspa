@@ -9,10 +9,10 @@ mod dto;
 mod operators;
 mod tasks;
 
+use crate::tasks::who_to_follow;
 use clap::{App, Arg, SubCommand};
 use tasks::load;
 use tasks::post_stats;
-use crate::tasks::who_to_follow;
 
 fn main() {
     let matches = App::new("DSPA")
@@ -28,10 +28,7 @@ fn main() {
             SubCommand::with_name("post-stats")
                 .about("Active posts(12 hours) statistics updated every 30 minutes."),
         )
-        .subcommand(
-            SubCommand::with_name("who-to-follow")
-                .about("Friend recommendation service."),
-        )
+        .subcommand(SubCommand::with_name("who-to-follow").about("Friend recommendation service."))
         .get_matches();
 
     if let ("load", Some(args)) = matches.subcommand() {
