@@ -18,7 +18,7 @@ mkdir -p $PLOT_DIR
 
 function usage() {
     echo "Usage: $0 [OPTION]..."
-	echo "Download datasets for the project."
+    echo "Download datasets for the project."
 
     echo -e "\nOptions: "
     printf "\t %- 30s %s\n" "-s | --download-small" "Download small dataset."
@@ -30,13 +30,13 @@ function usage() {
 }
 
 function download() {
-	pushd $DATA_DIR
+    pushd $DATA_DIR
 
-	wget $1
-	unzip download
-	rm download
+    wget $1
+    unzip download
+    rm download
 
-	popd
+    popd
 }
 
 function generate_video() {
@@ -51,13 +51,13 @@ function parse_command_line_options() {
     while [ "${1:-}" != "" ]; do
         case $1 in
             -s | --download-small)
-				download $SMALL
-				shift
+                download $SMALL
+                shift
                 ;;
-	        -b | --download-big)
-				download $BIG
-				shift
-	            ;;
+            -b | --download-big)
+                download $BIG
+                shift
+                ;;
             -v | --video-outliers)
                 generate_video
                 shift
