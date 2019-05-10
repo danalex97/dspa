@@ -1,22 +1,26 @@
 extern crate rand;
+extern crate timely;
 
-use std::f64::NAN;
-use std::cmp::Ordering::Equal;
-use std::string::ToString;
-use crate::operators::source::KafkaSource;
 use crate::connection::producer::FIXED_BOUNDED_DELAY;
-use crate::operators::buffer::Buffer;
-use crate::dto::post::Post;
-use crate::util::Plotter;
-use rand::Rng;
-use timely::dataflow::operators::generic::operator::Operator;
-use timely::dataflow::channels::pact::{Exchange, Pipeline};
-use timely::dataflow::operators::inspect::Inspect;
 use crate::dsa::stash::*;
-use std::collections::HashSet;
-use std::collections::HashMap;
-use std::iter::FromIterator;
+use crate::dto::post::Post;
+use crate::operators::buffer::Buffer;
+use crate::operators::source::KafkaSource;
+use crate::util::Plotter;
+
 use std::cmp::min;
+use std::cmp::Ordering::Equal;
+use std::collections::HashMap;
+use std::collections::HashSet;
+use std::f64::NAN;
+use std::iter::FromIterator;
+use std::string::ToString;
+
+use rand::Rng;
+
+use timely::dataflow::channels::pact::{Exchange, Pipeline};
+use timely::dataflow::operators::generic::operator::Operator;
+use timely::dataflow::operators::inspect::Inspect;
 
 const MAX_POST_LENGTH: usize = 64;
 const NUM_CLUSTERS: usize = 10;
@@ -31,7 +35,7 @@ fn sqr_dist((x, y): &Point, (x2, y2): &Point) -> f64 {
     (x - x2) * (x - x2) + (y - y2) * (y - y2)
 }
 
-fn compute_clusters(centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Vec<Point>> {
+fn compute_clusters(centers: &Vec<Point>, points: &Vec<Point>) -> Vec<Vec<Point>> {
     let mut clusters = Vec::new();
     for _ in 0..centers.len() {
         clusters.push(vec![]);
@@ -49,7 +53,7 @@ fn compute_clusters(centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Vec<Point
     clusters
 }
 
-fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
+fn compute_centers(old_centers: &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
     let mut centers = vec![];
     for center in old_centers.iter() {
         centers.push(*center);
@@ -57,9 +61,10 @@ fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
 
     // add new random centers
     while centers.len() < NUM_CLUSTERS {
-
-
-        centers.push((rand::thread_rng().gen_range(0., 1.), rand::thread_rng().gen_range(0., 1.)));
+        centers.push((
+            rand::thread_rng().gen_range(0., 1.),
+            rand::thread_rng().gen_range(0., 1.),
+        ));
     }
 
     for i in 0..20 {
@@ -108,7 +113,7 @@ fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
     relevant_centers
 }
 
-fn compute_outliers(centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
+fn compute_outliers(centers: &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
     // calculate distances to closest cluster
     let mut dist = vec![];
     for point in points.iter() {
@@ -152,45 +157,52 @@ fn compute_outliers(centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
     outliers
 }
 
-fn get_data_point(text : &String) -> Option<Point> {
+fn get_data_point(text: &String) -> Option<Point> {
     let mut alpha_text = text.clone();
 
     // remove punctuation
     for sep in "?!.,;:".chars() {
         alpha_text.replace(sep, " ");
     }
-    alpha_text.retain(|c| c.is_alphabetic() || c.is_whitespace());
 
+    // keep only alpha text
+    alpha_text.retain(|c| c.is_alphabetic() || c.is_whitespace());
     let mut words: Vec<_> = alpha_text
         .split_whitespace()
         .map(|x| x.to_string())
         .collect();
-    // remove proper nouns and extra spaces
+
+    // lower case
     words = words.iter().map(|x| x.to_lowercase()).collect();
 
     let text_len = words.len();
-
     if text_len < 2 {
         return None;
     }
 
-    let unique_words : HashSet<_> = HashSet::from_iter(words.iter().cloned());
+    let unique_words: HashSet<_> = HashSet::from_iter(words.iter().cloned());
     let uniq_len = unique_words.len();
 
     let mut unique_bigrams = HashSet::new();
     for i in 0..words.len() - 2 {
         unique_bigrams.insert(words[i].clone() + " " + &words[i + 1].clone());
     }
-    // temporary
-    let text_len = unique_words.len();
-    let uniq_len = unique_bigrams.len();
 
-    let text_len = if text_len > MAX_POST_LENGTH
-        { 1. } else { text_len as f64 / MAX_POST_LENGTH as f64 };
-    let uniq_len = if uniq_len > MAX_POST_LENGTH
-        { 1. } else { uniq_len as f64 / MAX_POST_LENGTH as f64 };
+    let uniq_words_len = unique_words.len();
+    let uniq_bigam_len = unique_bigrams.len();
 
-    return Some((text_len, uniq_len))
+    let uniq_words_len = if uniq_words_len > MAX_POST_LENGTH {
+        1.
+    } else {
+        uniq_words_len as f64 / MAX_POST_LENGTH as f64
+    };
+    let uniq_bigam_len = if uniq_bigam_len > MAX_POST_LENGTH {
+        1.
+    } else {
+        uniq_bigam_len as f64 / MAX_POST_LENGTH as f64
+    };
+
+    return Some((uniq_words_len, uniq_bigam_len));
 }
 
 pub fn run() {
@@ -207,52 +219,61 @@ pub fn run() {
             let mut stash = Stash::new();
 
             let mut plotter = Plotter::new();
-            buffered_posts.unary_notify(Pipeline, "Unusual Activity", None, move |input, output, notificator| {
-                let mut vec = vec![];
-                while let Some((time, data)) = input.next() {
-                    data.swap(&mut vec);
-                    if !first_notified {
-                        notificator.notify_at(time.delayed(&(time.time() + NOTIFY_PERIOD)));
-                        first_notified = true;
-                    }
-                    for post in vec.drain(..) {
-                        if let Some(data_point) = get_data_point(&post.content.clone()) {
-                            stash.stash(*time.time(), (data_point, post));
-                        }
-                    }
-
-                    notificator.for_each(|cap, _, notificator| {
-                        notificator.notify_at(cap.delayed(&(cap.time() + NOTIFY_PERIOD)));
-
-                        let mut possible_outliers = stash.extract(NOTIFY_PERIOD, *cap.time());
-                        for (point, post) in possible_outliers.iter() {
-                            points.push(*point);
-                        }
-
-                        if points.len() > MIN_POINTS {
-                            centers  = compute_centers(&centers, &points);
-                            let outliers = compute_outliers(&centers, &points);
-
-                            // plot points for debugging
-                            plotter.plot_points(&centers, &points, &outliers);
-
-                            // finding outliers from current batch
-                            let mut session = output.session(&cap);
-                            let mut outlier_ids = HashSet::new();
-                            for outlier in outliers {
-                                for (point, post) in possible_outliers.iter() {
-                                    if sqr_dist(point, &outlier) < EPS {
-                                        if !outlier_ids.contains(&post.id) {
-                                            session.give(post.clone());
-                                        }
-                                        outlier_ids.insert(&post.id);
-                                    }
+            buffered_posts
+                .unary_notify(
+                    Pipeline,
+                    "Unusual Activity",
+                    None,
+                    move |input, output, notificator| {
+                        let mut vec = vec![];
+                        while let Some((time, data)) = input.next() {
+                            data.swap(&mut vec);
+                            if !first_notified {
+                                notificator.notify_at(time.delayed(&(time.time() + NOTIFY_PERIOD)));
+                                first_notified = true;
+                            }
+                            for post in vec.drain(..) {
+                                if let Some(data_point) = get_data_point(&post.content.clone()) {
+                                    stash.stash(*time.time(), (data_point, post));
                                 }
                             }
+
+                            notificator.for_each(|cap, _, notificator| {
+                                notificator.notify_at(cap.delayed(&(cap.time() + NOTIFY_PERIOD)));
+
+                                let mut possible_outliers =
+                                    stash.extract(NOTIFY_PERIOD, *cap.time());
+                                for (point, post) in possible_outliers.iter() {
+                                    points.push(*point);
+                                }
+
+                                if points.len() > MIN_POINTS {
+                                    centers = compute_centers(&centers, &points);
+                                    let outliers = compute_outliers(&centers, &points);
+
+                                    // plot points for debugging
+                                    plotter.plot_points(&centers, &points, &outliers);
+
+                                    // finding outliers from current batch
+                                    let mut session = output.session(&cap);
+                                    let mut outlier_ids = HashSet::new();
+                                    for outlier in outliers {
+                                        for (point, post) in possible_outliers.iter() {
+                                            if sqr_dist(point, &outlier) < EPS {
+                                                if !outlier_ids.contains(&post.id) {
+                                                    session.give(post.clone());
+                                                }
+                                                outlier_ids.insert(&post.id);
+                                            }
+                                        }
+                                    }
+                                }
+                            });
                         }
-                    });
-                }
-            }).inspect(|x| println!("{:?}", x));
+                    },
+                )
+                .inspect(|x| println!("{:?}", x));
         })
-    }).unwrap();
+    })
+    .unwrap();
 }

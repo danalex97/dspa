@@ -11,7 +11,7 @@ mod tasks;
 mod util;
 
 use clap::{App, Arg, SubCommand};
-use tasks::{load, post_stats, who_to_follow, unusual_activity};
+use tasks::{load, post_stats, unusual_activity, who_to_follow};
 
 fn main() {
     let matches = App::new("DSPA")

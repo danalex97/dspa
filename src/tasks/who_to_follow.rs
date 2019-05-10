@@ -79,16 +79,16 @@ pub fn run() {
             let mut person_forums: HashMap<u32, HashSet<u32>> = HashMap::new();
             for (forum_id, forum) in &forum_map {
                 for member in &forum.member_ids {
-                    person_forums.entry(*member).or_insert(HashSet::new()).insert(*forum_id);
+                    person_forums
+                        .entry(*member)
+                        .or_insert(HashSet::new())
+                        .insert(*forum_id);
                 }
             }
 
             let mut first_notified = false;
             let mut post_info = HashMap::new(); // map: post_id -> (forum, tags)
-            // let mut people_engaged_with_forum = HashMap::new(); // map: forum -> set[people]
-            // let mut people_engaged_with_tag = HashMap::new(); // map: tag -> set[people]
-            // vector of (post_id, interacting_users)
-            let mut active_post_snapshot = Vec::new();
+            let mut active_post_snapshot = Vec::new(); // vector of (post_id, interacting_users)
             active_posts
                 .binary_notify(
                     &buffered_posts,
@@ -125,6 +125,7 @@ pub fn run() {
 
                             // the posts that our users are engaged with
                             let mut posts_of_interest = HashMap::new(); // map: user -> set[posts]
+
                             // you have the guarantee that we will have a new snapshot before the
                             // next notification, so we can drain it
                             for (post_id, engaged_people) in active_post_snapshot.drain(..) {
