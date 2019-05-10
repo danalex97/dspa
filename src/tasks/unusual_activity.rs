@@ -7,6 +7,7 @@ use plotlib::view::ContinuousView;
 use plotlib::style::{PointMarker, PointStyle};
 
 use std::f64::NAN;
+use std::cmp::Ordering::Equal;
 use std::string::ToString;
 use crate::operators::source::KafkaSource;
 use crate::connection::producer::FIXED_BOUNDED_DELAY;
@@ -64,6 +65,7 @@ fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
     let mut ord: Vec<usize> = (0..old_centers.len()).collect();
     rand::thread_rng().shuffle(&mut ord);
 
+    // [TODO]: keep centers with most coverage!
     // keep half of the old centers
     let mut keep = NUM_CLUSTERS/2;
     for i in ord.iter() {
@@ -81,7 +83,6 @@ fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
     }
 
     for i in 0..20 {
-        println!("{:?} {:?}", i, centers);
         let mut clusters = Vec::new();
         for _ in 0..NUM_CLUSTERS {
             clusters.push(vec![]);
@@ -123,10 +124,51 @@ fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
         }
     }
     centers.retain(|(x, y)| *x != NAN && *y != NAN);
-
-    plot_points(&centers, points);
-    println!("{:?}", centers);
     centers
+}
+
+fn compute_outliers(centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
+    // calculate distances to closest cluster
+    let mut dist = vec![];
+    for point in points.iter() {
+        let mut min_dist = 2.;
+        for center in centers.iter() {
+            if sqr_dist(center, point) < min_dist {
+                min_dist = sqr_dist(center, point);
+            }
+        }
+        dist.push(min_dist);
+    }
+
+    // compute 99th percentile
+    dist.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Equal));
+    let pct = (0.99 * dist.len() as f64) as usize;
+
+    // find minimum distance for an outlier
+    let mut dist_outlier = 2.;
+    for i in pct..dist.len() - 1 {
+        if dist[i + 1] - dist[i] > (dist[i] - dist[i - 1]) * 2. {
+            dist_outlier = dist[i + 1];
+            break;
+        }
+    }
+
+    // find outliers
+    let mut outliers = vec![];
+    for point in points.iter() {
+        let mut min_dist = 2.;
+        for center in centers.iter() {
+            if sqr_dist(center, point) < min_dist {
+                min_dist = sqr_dist(center, point);
+            }
+        }
+
+        if min_dist >= dist_outlier {
+            outliers.push(*point);
+        }
+    }
+
+    outliers
 }
 
 fn get_data_point(text : &String) -> Option<Point> {
@@ -206,7 +248,10 @@ pub fn run() {
                         }
 
                         if points.len() > MIN_POINTS {
-                            centers = compute_centers(&centers, &points);
+                            centers  = compute_centers(&centers, &points);
+                            let outliers = compute_outliers(&centers, &points);
+
+                            plot_points(&outliers, &points);
                         }
 
                         let mut session = output.session(&cap);
