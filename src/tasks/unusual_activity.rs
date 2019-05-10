@@ -1,4 +1,10 @@
 extern crate rand;
+extern crate plotlib;
+
+use plotlib::page::Page;
+use plotlib::repr::Scatter;
+use plotlib::view::ContinuousView;
+use plotlib::style::{PointMarker, PointStyle};
 
 use std::string::ToString;
 use crate::operators::source::KafkaSource;
@@ -12,17 +18,43 @@ use timely::dataflow::operators::inspect::Inspect;
 use crate::dsa::stash::*;
 use std::collections::HashSet;
 use std::collections::HashMap;
+use std::iter::FromIterator;
 use std::cmp::min;
 
-const MAX_POST_LENGTH: u8 = 200;
-const NUM_CLUSTERS: usize = 20;
+const MAX_POST_LENGTH: usize = 80;
+const NUM_CLUSTERS: usize = 5;
 const NOTIFY_PERIOD: usize = 12 * 60 * 60; // seconds
-const MIN_POINTS: usize = 1000;
+const MIN_POINTS: usize = 2000;
 
 type Point = (f64, f64);
 
 fn sqr_dist((x, y): &Point, (x2, y2): &Point) -> f64 {
     (x - x2) * (x - x2) + (y - y2) * (y - y2)
+}
+
+fn plot_points(centers : &Vec<Point>, points: &Vec<Point>) {
+    let s1 = Scatter::from_slice(points).style(
+       PointStyle::new()
+           .marker(PointMarker::Square)
+           .colour("#DD3355")
+           .size(1.),
+   );
+   let s2 = Scatter::from_slice(centers).style(
+       PointStyle::new()
+           .colour("#35C788")
+           .size(2.),
+   );
+
+   let v = ContinuousView::new()
+        .add(&s1)
+        .add(&s2)
+        .x_range(0., 1.)
+        .y_range(0., 1.)
+        .x_label("Some varying variable")
+        .y_label("The response of something");
+
+    // A page with a single view is then saved to an SVG file
+    Page::single(&v).save("scatter.svg").unwrap();
 }
 
 fn compute_centers(centers: &mut Vec<Point>, points: &Vec<Point>) {
@@ -74,7 +106,49 @@ fn compute_centers(centers: &mut Vec<Point>, points: &Vec<Point>) {
             centers[i] = new_centers[i];
         }
     }
-    println!("final {:?}", centers);
+    plot_points(centers, points);
+    println!("{:?}", centers);
+}
+
+fn get_data_point(text : &String) -> Option<Point> {
+    let mut alpha_text = text.clone();
+
+    // remove punctuation
+    for sep in "?!.,;:".chars() {
+        alpha_text.replace(sep, " ");
+    }
+    alpha_text.retain(|c| c.is_alphabetic() || c.is_whitespace());
+
+    let mut words: Vec<_> = alpha_text
+        .split_whitespace()
+        .map(|x| x.to_string())
+        .collect();
+    // remove proper nouns and extra spaces
+    words = words.iter().map(|x| x.to_lowercase()).collect();
+
+    let text_len = words.len();
+
+    if text_len < 2 {
+        return None;
+    }
+
+    let unique_words : HashSet<_> = HashSet::from_iter(words.iter().cloned());
+    let uniq_len = unique_words.len();
+
+    let mut unique_bigrams = HashSet::new();
+    for i in 0..words.len() - 2 {
+        unique_bigrams.insert(words[i].clone() + " " + &words[i + 1].clone());
+    }
+    // temporary
+    let text_len = unique_words.len();
+    let uniq_len = unique_bigrams.len();
+
+    let text_len = if text_len > MAX_POST_LENGTH
+        { 1. } else { text_len as f64 / MAX_POST_LENGTH as f64 };
+    let uniq_len = if uniq_len > MAX_POST_LENGTH
+        { 1. } else { uniq_len as f64 / MAX_POST_LENGTH as f64 };
+
+    return Some((text_len, uniq_len))
 }
 
 pub fn run() {
@@ -98,24 +172,8 @@ pub fn run() {
                         first_notified = true;
                     }
                     for post in vec.drain(..) {
-                        let text: String = post.content.clone();
-                        let split = text.split_whitespace();
-                        let mut text_length = 0;
-                        let mut unique_words = HashSet::new();
-                        for word in split {
-                            text_length += 1;
-                            unique_words.insert(word.to_lowercase());
-                        }
-                        if text_length != 0 {
-                            //let normalised_length = min(text_length as f64 / MAX_POST_LENGTH as f64, 1f64);
-                            let normalised_length : f64 =
-                                if text_length > MAX_POST_LENGTH {
-                                    1f64
-                                } else {
-                                    text_length as f64 / MAX_POST_LENGTH as f64
-                                };
-                            let ratio_unique = unique_words.len() as f64 / text_length as f64;
-                            stash.stash(*time.time(), ((ratio_unique, normalised_length), post));
+                        if let Some(data_point) = get_data_point(&post.content.clone()) {
+                            stash.stash(*time.time(), (data_point, post));
                         }
                     }
 
