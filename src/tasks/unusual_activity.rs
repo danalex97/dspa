@@ -23,8 +23,9 @@ use std::collections::HashMap;
 use std::iter::FromIterator;
 use std::cmp::min;
 
-const MAX_POST_LENGTH: usize = 80;
-const NUM_CLUSTERS: usize = 20;
+const MAX_POST_LENGTH: usize = 64;
+const NUM_CLUSTERS: usize = 10;
+const MIN_COVERAGE: usize = 30;
 const NOTIFY_PERIOD: usize = 12 * 60 * 60; // seconds
 const MIN_POINTS: usize = 2000;
 
@@ -34,14 +35,19 @@ fn sqr_dist((x, y): &Point, (x2, y2): &Point) -> f64 {
     (x - x2) * (x - x2) + (y - y2) * (y - y2)
 }
 
-fn plot_points(centers : &Vec<Point>, points: &Vec<Point>) {
+fn plot_points(centers : &Vec<Point>, points: &Vec<Point>, outliers: &Vec<Point>) {
     let s1 = Scatter::from_slice(points).style(
        PointStyle::new()
            .marker(PointMarker::Square)
            .colour("#DD3355")
            .size(1.),
    );
-   let s2 = Scatter::from_slice(centers).style(
+   let s2 = Scatter::from_slice(outliers).style(
+       PointStyle::new()
+           .colour("#442288")
+           .size(1.),
+   );
+   let s3 = Scatter::from_slice(centers).style(
        PointStyle::new()
            .colour("#35C788")
            .size(2.),
@@ -50,6 +56,7 @@ fn plot_points(centers : &Vec<Point>, points: &Vec<Point>) {
    let v = ContinuousView::new()
         .add(&s1)
         .add(&s2)
+        .add(&s3)
         .x_range(0., 1.)
         .y_range(0., 1.)
         .x_label("Some varying variable")
@@ -59,44 +66,39 @@ fn plot_points(centers : &Vec<Point>, points: &Vec<Point>) {
     Page::single(&v).save("scatter.svg").unwrap();
 }
 
+fn compute_clusters(centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Vec<Point>> {
+    let mut clusters = Vec::new();
+    for _ in 0..centers.len() {
+        clusters.push(vec![]);
+    }
+    for point in points {
+        let mut i_closest = 0;
+        for (i, center) in centers.iter().enumerate() {
+            if sqr_dist(&center, &point) < sqr_dist(&centers[i_closest], &point) {
+                i_closest = i;
+            }
+        }
+
+        clusters[i_closest].push(*point);
+    }
+    clusters
+}
+
 fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
     let mut centers = vec![];
-
-    let mut ord: Vec<usize> = (0..old_centers.len()).collect();
-    rand::thread_rng().shuffle(&mut ord);
-
-    // [TODO]: keep centers with most coverage!
-    // keep half of the old centers
-    let mut keep = NUM_CLUSTERS/2;
-    for i in ord.iter() {
-        if keep == 0 {
-            break;
-        }
-        let (x, y) = old_centers[*i];
-        keep -= 1;
+    for center in old_centers.iter() {
+        centers.push(*center);
     }
 
-    // add new centers
+    // add new random centers
     while centers.len() < NUM_CLUSTERS {
-        let i = rand::thread_rng().gen_range(0, points.len());
-        centers.push(points[i]);
+
+
+        centers.push((rand::thread_rng().gen_range(0., 1.), rand::thread_rng().gen_range(0., 1.)));
     }
 
     for i in 0..20 {
-        let mut clusters = Vec::new();
-        for _ in 0..NUM_CLUSTERS {
-            clusters.push(vec![]);
-        }
-        for point in points {
-            let mut i_closest = 0;
-            for (i, center) in centers.iter().enumerate() {
-                if sqr_dist(&center, &point) < sqr_dist(&centers[i_closest], &point) {
-                    i_closest = i;
-                }
-            }
-
-            clusters[i_closest].push(point);
-        }
+        let clusters = compute_clusters(&centers, &points);
 
         let mut new_centers = vec![];
         for cluster in clusters {
@@ -124,7 +126,21 @@ fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
         }
     }
     centers.retain(|(x, y)| *x != NAN && *y != NAN);
-    centers
+
+    // sort centers by coverage
+    let mut ord: Vec<usize> = (0..centers.len()).collect();
+    let clusters = compute_clusters(&centers, &points);
+    ord.sort_by(|a, b| clusters[*a].len().cmp(&clusters[*b].len()));
+
+    // remove clusters with small coverage
+    let mut relevant_centers = vec![];
+    for i in 0..centers.len() {
+        if clusters[i].len() >= MIN_COVERAGE {
+            relevant_centers.push(centers[i]);
+        }
+    }
+
+    relevant_centers
 }
 
 fn compute_outliers(centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
@@ -140,7 +156,7 @@ fn compute_outliers(centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
         dist.push(min_dist);
     }
 
-    // compute 99th percentile
+    // compute percentile
     dist.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Equal));
     let pct = (0.99 * dist.len() as f64) as usize;
 
@@ -251,7 +267,7 @@ pub fn run() {
                             centers  = compute_centers(&centers, &points);
                             let outliers = compute_outliers(&centers, &points);
 
-                            plot_points(&outliers, &points);
+                            plot_points(&centers, &points, &outliers);
                         }
 
                         let mut session = output.session(&cap);
