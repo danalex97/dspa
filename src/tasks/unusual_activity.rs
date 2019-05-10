@@ -6,6 +6,7 @@ use plotlib::repr::Scatter;
 use plotlib::view::ContinuousView;
 use plotlib::style::{PointMarker, PointStyle};
 
+use std::f64::NAN;
 use std::string::ToString;
 use crate::operators::source::KafkaSource;
 use crate::connection::producer::FIXED_BOUNDED_DELAY;
@@ -22,7 +23,7 @@ use std::iter::FromIterator;
 use std::cmp::min;
 
 const MAX_POST_LENGTH: usize = 80;
-const NUM_CLUSTERS: usize = 5;
+const NUM_CLUSTERS: usize = 20;
 const NOTIFY_PERIOD: usize = 12 * 60 * 60; // seconds
 const MIN_POINTS: usize = 2000;
 
@@ -57,15 +58,30 @@ fn plot_points(centers : &Vec<Point>, points: &Vec<Point>) {
     Page::single(&v).save("scatter.svg").unwrap();
 }
 
-fn compute_centers(centers: &mut Vec<Point>, points: &Vec<Point>) {
-    if centers.len() == 0 {
-        for _ in 0..NUM_CLUSTERS {
-            let i = rand::thread_rng().gen_range(0, points.len());
-            centers.push(points[i]);
+fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
+    let mut centers = vec![];
+
+    let mut ord: Vec<usize> = (0..old_centers.len()).collect();
+    rand::thread_rng().shuffle(&mut ord);
+
+    // keep half of the old centers
+    let mut keep = NUM_CLUSTERS/2;
+    for i in ord.iter() {
+        if keep == 0 {
+            break;
         }
+        let (x, y) = old_centers[*i];
+        keep -= 1;
     }
 
-    for _ in 0..20 {
+    // add new centers
+    while centers.len() < NUM_CLUSTERS {
+        let i = rand::thread_rng().gen_range(0, points.len());
+        centers.push(points[i]);
+    }
+
+    for i in 0..20 {
+        println!("{:?} {:?}", i, centers);
         let mut clusters = Vec::new();
         for _ in 0..NUM_CLUSTERS {
             clusters.push(vec![]);
@@ -106,8 +122,11 @@ fn compute_centers(centers: &mut Vec<Point>, points: &Vec<Point>) {
             centers[i] = new_centers[i];
         }
     }
-    plot_points(centers, points);
+    centers.retain(|(x, y)| *x != NAN && *y != NAN);
+
+    plot_points(&centers, points);
     println!("{:?}", centers);
+    centers
 }
 
 fn get_data_point(text : &String) -> Option<Point> {
@@ -158,8 +177,8 @@ pub fn run() {
             let buffered_posts =
                 posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY);
 
-            let mut centers: Vec<Point> = vec![];
             let mut points: Vec<Point> = vec![];
+            let mut centers: Vec<Point> = vec![];
 
             let mut first_notified = false;
             let mut stash = Stash::new();
@@ -187,7 +206,7 @@ pub fn run() {
                         }
 
                         if points.len() > MIN_POINTS {
-                            compute_centers(&mut centers, &points);
+                            centers = compute_centers(&centers, &points);
                         }
 
                         let mut session = output.session(&cap);
