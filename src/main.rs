@@ -48,6 +48,6 @@ fn main() {
         who_to_follow::run();
     }
 
-    load::run(Some(1000));
+    load::run(Some(10000));
     unusual_activity::run();
 }
