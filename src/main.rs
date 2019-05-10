@@ -8,6 +8,7 @@ mod dsa;
 mod dto;
 mod operators;
 mod tasks;
+mod util;
 
 use clap::{App, Arg, SubCommand};
 use tasks::{load, post_stats, who_to_follow, unusual_activity};

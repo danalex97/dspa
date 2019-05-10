@@ -1,10 +1,4 @@
 extern crate rand;
-extern crate plotlib;
-
-use plotlib::page::Page;
-use plotlib::repr::Scatter;
-use plotlib::view::ContinuousView;
-use plotlib::style::{PointMarker, PointStyle};
 
 use std::f64::NAN;
 use std::cmp::Ordering::Equal;
@@ -13,6 +7,7 @@ use crate::operators::source::KafkaSource;
 use crate::connection::producer::FIXED_BOUNDED_DELAY;
 use crate::operators::buffer::Buffer;
 use crate::dto::post::Post;
+use crate::util::Plotter;
 use rand::Rng;
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::channels::pact::{Exchange, Pipeline};
@@ -34,37 +29,6 @@ type Point = (f64, f64);
 
 fn sqr_dist((x, y): &Point, (x2, y2): &Point) -> f64 {
     (x - x2) * (x - x2) + (y - y2) * (y - y2)
-}
-
-fn plot_points(centers : &Vec<Point>, points: &Vec<Point>, outliers: &Vec<Point>) {
-    let s1 = Scatter::from_slice(points).style(
-       PointStyle::new()
-           .marker(PointMarker::Square)
-           .colour("#DD3355")
-           .size(1.),
-   );
-   let s2 = Scatter::from_slice(outliers).style(
-       PointStyle::new()
-           .colour("#442288")
-           .size(1.),
-   );
-   let s3 = Scatter::from_slice(centers).style(
-       PointStyle::new()
-           .colour("#35C788")
-           .size(2.),
-   );
-
-   let v = ContinuousView::new()
-        .add(&s1)
-        .add(&s2)
-        .add(&s3)
-        .x_range(0., 1.)
-        .y_range(0., 1.)
-        .x_label("Some varying variable")
-        .y_label("The response of something");
-
-    // A page with a single view is then saved to an SVG file
-    Page::single(&v).save("scatter.svg").unwrap();
 }
 
 fn compute_clusters(centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Vec<Point>> {
@@ -241,6 +205,8 @@ pub fn run() {
 
             let mut first_notified = false;
             let mut stash = Stash::new();
+
+            let mut plotter = Plotter::new();
             buffered_posts.unary_notify(Pipeline, "Unusual Activity", None, move |input, output, notificator| {
                 let mut vec = vec![];
                 while let Some((time, data)) = input.next() {
@@ -268,7 +234,7 @@ pub fn run() {
                             let outliers = compute_outliers(&centers, &points);
 
                             // plot points for debugging
-                            plot_points(&centers, &points, &outliers);
+                            plotter.plot_points(&centers, &points, &outliers);
 
                             // finding outliers from current batch
                             let mut session = output.session(&cap);
