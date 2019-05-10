@@ -28,6 +28,7 @@ const NUM_CLUSTERS: usize = 10;
 const MIN_COVERAGE: usize = 30;
 const NOTIFY_PERIOD: usize = 12 * 60 * 60; // seconds
 const MIN_POINTS: usize = 2000;
+const EPS: f64 = 0.00001;
 
 type Point = (f64, f64);
 
@@ -118,7 +119,7 @@ fn compute_centers(old_centers : &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
             tot_diff += sqr_dist(&new_centers[i], &centers[i]);
         }
 
-        if tot_diff < 0.00001 {
+        if tot_diff < EPS {
             break;
         }
         for i in 0..NUM_CLUSTERS {
@@ -257,24 +258,35 @@ pub fn run() {
                     notificator.for_each(|cap, _, notificator| {
                         notificator.notify_at(cap.delayed(&(cap.time() + NOTIFY_PERIOD)));
 
-                        let mut possible_outliers = HashMap::new();
-                        for (point, post) in stash.extract(NOTIFY_PERIOD, *cap.time()) {
-                            possible_outliers.insert(post.id, point);
-                            points.push(point);
+                        let mut possible_outliers = stash.extract(NOTIFY_PERIOD, *cap.time());
+                        for (point, post) in possible_outliers.iter() {
+                            points.push(*point);
                         }
 
                         if points.len() > MIN_POINTS {
                             centers  = compute_centers(&centers, &points);
                             let outliers = compute_outliers(&centers, &points);
 
+                            // plot points for debugging
                             plot_points(&centers, &points, &outliers);
-                        }
 
-                        let mut session = output.session(&cap);
-                        session.give(1);
+                            // finding outliers from current batch
+                            let mut session = output.session(&cap);
+                            let mut outlier_ids = HashSet::new();
+                            for outlier in outliers {
+                                for (point, post) in possible_outliers.iter() {
+                                    if sqr_dist(point, &outlier) < EPS {
+                                        if !outlier_ids.contains(&post.id) {
+                                            session.give(post.clone());
+                                        }
+                                        outlier_ids.insert(&post.id);
+                                    }
+                                }
+                            }
+                        }
                     });
                 }
-            });//.inspect(|x| println!("{:?}", x));
+            }).inspect(|x| println!("{:?}", x));
         })
     }).unwrap();
 }
