@@ -2,12 +2,13 @@ extern crate futures;
 extern crate rand;
 extern crate rdkafka;
 
+use crate::dsa::stash::{Stash, Stashable};
 use chrono::offset::TimeZone;
 use chrono::{DateTime, Duration, FixedOffset};
 use rand::Rng;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use std::collections::BinaryHeap;
+use std::collections::binary_heap::BinaryHeap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -34,61 +35,65 @@ impl Producer {
         }
     }
 
-    pub fn write_file(&mut self, file_name: &str, lines: Option<usize>) -> usize {
+    pub fn write_file(
+        &mut self,
+        file_name: &str,
+        lines: Option<usize>,
+        start_time: &DateTime<FixedOffset>,
+    ) -> usize {
         let f = File::open(file_name).unwrap();
         let f = BufReader::new(f);
 
-        let mut epoch_start_time = FixedOffset::east(0)
-            .ymd(2000, 1, 1)
-            .and_hms_milli(12, 0, 0, 0);
-        let mut buffer: BinaryHeap<(i64, String)> = BinaryHeap::new();
+        let mut stash: Stash<String> = Stash::new();
+
+        let mut epoch_start_time = start_time.clone();
 
         let mut cnt = 0;
         for line in f.lines().skip(1) {
             let line = line.unwrap();
             let fields: Vec<&str> = line.split("|").collect();
             let creation_time = DateTime::parse_from_rfc3339(fields[2]).unwrap();
+
             if creation_time > epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64) {
-                for (time, data) in buffer.into_sorted_vec() {
+                let old_time = epoch_start_time.timestamp();
+                // Generate some watermarks for every five minute period between
+                // and output the stashed lines
+                while creation_time
+                    > epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64)
+                {
+                    // Gen watermark
+                    stash.stash(
+                        epoch_start_time.timestamp() as usize,
+                        "Watermark|".to_owned() + &epoch_start_time.timestamp().to_string(),
+                    );
+                    epoch_start_time =
+                        epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64);
+                }
+                let mut stashed_lines = stash.extract(
+                    (epoch_start_time.timestamp() - old_time) as usize,
+                    epoch_start_time.timestamp() as usize,
+                );
+                for stashed_line in stashed_lines.drain(..) {
                     self.producer.send(
                         FutureRecord::to(&self.topic)
-                            .payload(&data)
-                            .key(&self.key.to_string())
-                            .timestamp(time),
-                        1000,
+                            .payload(&stashed_line)
+                            .key(&self.key.to_string()),
+                        0,
                     );
                     self.key += 1;
-                    cnt += 1;
                     if let Some(lines) = lines {
-                        if cnt == lines {
+                        if cnt >= lines {
                             return cnt;
                         }
                     }
                 }
-                epoch_start_time = creation_time;
-                buffer = BinaryHeap::new();
             }
+            // Stash the line with a random fixed bounded delay
             let offset =
                 Duration::seconds(rand::thread_rng().gen_range(1, FIXED_BOUNDED_DELAY) as i64);
             let insertion_time = creation_time + offset;
-            buffer.push((insertion_time.timestamp(), line));
-        }
-
-        for (time, data) in buffer.into_sorted_vec() {
-            self.producer.send(
-                FutureRecord::to(&self.topic)
-                    .payload(&data)
-                    .key(&self.key.to_string())
-                    .timestamp(time),
-                0,
-            );
-            self.key += 1;
+            stash.stash(insertion_time.timestamp() as usize, line);
             cnt += 1;
-            if let Some(lines) = lines {
-                if cnt == lines {
-                    return cnt;
-                }
-            }
         }
 
         cnt

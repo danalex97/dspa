@@ -3,18 +3,44 @@ const COMMENTS_PATH: &str = "data/1k-users-sorted/streams/comment_event_stream.c
 const LIKES_PATH: &str = "data/1k-users-sorted/streams/likes_event_stream.csv";
 
 use crate::connection::producer::Producer;
+use chrono::DateTime;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
 
 pub fn run(records: Option<usize>) {
+    let mut creation_time = None;
+
+    let posts_file = File::open(POSTS_PATH).unwrap();
+    let posts_file = BufReader::new(posts_file);
+
+    for line in posts_file.lines().skip(1) {
+        let line = line.unwrap();
+        let fields: Vec<&str> = line.split("|").collect();
+        creation_time = Some(DateTime::parse_from_rfc3339(fields[2]).unwrap());
+        break;
+    }
     println!(
         "{} posts loaded to Kafka.",
-        Producer::new("posts".to_string()).write_file(POSTS_PATH, records)
+        Producer::new("posts".to_string()).write_file(
+            POSTS_PATH,
+            records,
+            &(creation_time.unwrap())
+        )
     );
     println!(
         "{} comments loaded to Kafka.",
-        Producer::new("comments".to_string()).write_file(COMMENTS_PATH, records)
+        Producer::new("comments".to_string()).write_file(
+            COMMENTS_PATH,
+            records,
+            &(creation_time.unwrap())
+        )
     );
     println!(
         "{} likes loaded to Kafka.",
-        Producer::new("likes".to_string()).write_file(LIKES_PATH, records)
+        Producer::new("likes".to_string()).write_file(
+            LIKES_PATH,
+            records,
+            &(creation_time.unwrap())
+        )
     );
 }
