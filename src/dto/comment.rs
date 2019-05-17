@@ -1,7 +1,7 @@
 extern crate chrono;
 extern crate csv;
 
-use crate::dto::common::maybe_record;
+use crate::dto::common::{maybe_record, Watermarkable};
 use crate::dto::common::Browser;
 use crate::dto::common::{Importable, Timestamped};
 
@@ -11,6 +11,7 @@ use csv::StringRecord;
 use std::cmp::Ordering;
 use std::error::Error;
 use std::option::Option;
+use std::net::Ipv4Addr;
 
 #[derive(Deserialize, Serialize, Clone, Debug)]
 pub struct Comment {
@@ -24,6 +25,7 @@ pub struct Comment {
     pub reply_to_comment_id: Option<u32>,
     pub place_id: u32,
     pub replies: Vec<Comment>,
+    pub is_watermark: bool,
 }
 
 impl Importable<Comment> for Comment {
@@ -49,11 +51,31 @@ impl Importable<Comment> for Comment {
             reply_to_comment_id,
             place_id,
             replies: vec![],
+            is_watermark: false,
         })
     }
 
     fn id(&self) -> Option<u32> {
         Some(self.id)
+    }
+}
+
+impl Watermarkable for Comment {
+
+    fn from_watermark(watermark: &str) -> Self {
+        Self {
+            id: 0,
+            person_id: 0,
+            timestamp: watermark.parse().unwrap(),
+            location_ip: Ipv4Addr::new(0,0,0,0),
+            browser_used: Browser::Chrome,
+            content: "".to_string(),
+            reply_to_post_id: None,
+            reply_to_comment_id: None,
+            place_id: 0,
+            replies: vec![],
+            is_watermark: true
+        }
     }
 }
 

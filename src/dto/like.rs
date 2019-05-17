@@ -1,7 +1,7 @@
 extern crate chrono;
 extern crate csv;
 
-use crate::dto::common::{Importable, Timestamped};
+use crate::dto::common::{Importable, Timestamped, Watermarkable};
 
 use chrono::DateTime;
 use csv::StringRecord;
@@ -12,6 +12,7 @@ pub struct Like {
     pub person_id: u32,
     pub post_id: u32,
     pub timestamp: usize,
+    pub is_watermark: bool,
 }
 
 impl Importable<Like> for Like {
@@ -24,11 +25,23 @@ impl Importable<Like> for Like {
             person_id,
             post_id,
             timestamp: creation_date.timestamp() as usize,
+            is_watermark: false,
         })
     }
 
     fn id(&self) -> Option<u32> {
         None
+    }
+}
+
+impl Watermarkable for Like {
+    fn from_watermark(watermark: &str) -> Like {
+        Like {
+            person_id: 0,
+            post_id: 0,
+            timestamp: watermark.parse().unwrap(),
+            is_watermark: true,
+        }
     }
 }
 

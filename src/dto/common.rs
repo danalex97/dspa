@@ -10,6 +10,10 @@ pub trait Importable<T> {
     fn id(&self) -> Option<u32>;
 }
 
+pub trait Watermarkable {
+    fn from_watermark(watermark: &str) -> Self;
+}
+
 pub trait Timestamped {
     fn timestamp(&self) -> usize;
 }

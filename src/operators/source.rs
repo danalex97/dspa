@@ -5,7 +5,7 @@ extern crate rdkafka_sys;
 extern crate timely;
 
 use crate::connection::producer::FIXED_BOUNDED_DELAY;
-use crate::dto::common::{Importable, Timestamped};
+use crate::dto::common::{Importable, Timestamped, Watermarkable};
 
 use timely::dataflow::operators::generic::operator::source;
 use timely::dataflow::scopes::Scope;
@@ -21,14 +21,14 @@ use csv::StringRecord;
 use std::time::Duration;
 
 pub trait KafkaSource<G: Scope> {
-    fn kafka_string_source<D: Importable<D> + Data + Timestamped>(
+    fn kafka_string_source<D: Importable<D> + Watermarkable + Data + Timestamped>(
         &self,
         topic: String,
     ) -> Stream<G, D>;
 }
 
 impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
-    fn kafka_string_source<D: Importable<D> + Data + Timestamped>(
+    fn kafka_string_source<D: Importable<D> + Watermarkable + Data + Timestamped>(
         &self,
         topic: String,
     ) -> Stream<G, D> {
@@ -67,22 +67,29 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
                                 let v: Vec<&str> = text.split("|").collect();
                                 let record = StringRecord::from(v);
 
-                                match D::from_record(record) {
-                                    Ok(record) => {
-                                        if let Some(cap) = cap.as_mut() {
-                                            let capability_time = cap.time().clone();
-                                            let candidate_time =
-                                                record.timestamp() - FIXED_BOUNDED_DELAY;
+                                if &record[0] == "Watermark" {
+                                    let watermarked = D::from_watermark(&record[1]);
+                                    cap.as_mut().unwrap().downgrade(&watermarked.timestamp());
+                                } else {
+                                    match D::from_record(record) {
+                                        Ok(record) => {
+                                            if let Some(cap) = cap.as_mut() {
+                                                let capability_time = cap.time().clone();
+                                                let candidate_time =
+                                                    record.timestamp() - FIXED_BOUNDED_DELAY;
 
-                                            // I have a tighter bound for downgrading the capability
-                                            if capability_time < candidate_time {
-                                                cap.downgrade(&candidate_time);
+                                                /*
+                                                // I have a tighter bound for downgrading the capability
+                                                if capability_time < candidate_time {
+                                                    cap.downgrade(&candidate_time);
+                                                }
+                                                */
+
+                                                output.session(&cap).give(record);
                                             }
-
-                                            output.session(&cap).give(record);
                                         }
+                                        Err(_) => {}
                                     }
-                                    Err(_) => {}
                                 }
                             }
                         },
