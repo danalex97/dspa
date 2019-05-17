@@ -31,6 +31,12 @@ function start_kafka() {
     nohup bin/kafka-server-start.sh config/server-1.properties >/dev/null 2>&1 &
     nohup bin/kafka-server-start.sh config/server-2.properties >/dev/null 2>&1 &
     echo "Processes started."
+    echo "Creating topics..."
+    sleep 2
+    make_topic "posts"
+    make_topic "comments"
+    make_topic "likes"
+    echo "Topics created."
 }
 
 function kill_process() {
@@ -70,6 +76,9 @@ function stop_all() {
     kill_process "zookeeper"
     kill_process "kafka"
     echo "All processes killed."
+    echo "Deleting files..."
+    rm -rf /tmp/zookeeper
+    rm -rf /tmp/kafka-logs
 }
 
 function parse_command_line_options() {
