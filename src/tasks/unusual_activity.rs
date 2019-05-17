@@ -249,14 +249,14 @@ pub fn run() {
 
                                     // finding outliers from current batch
                                     let mut session = output.session(&cap);
-                                    let mut outlier_ids = HashSet::new();
+                                    let mut people_ids = HashSet::new();
                                     for outlier in outliers {
                                         for (point, post) in possible_outliers.iter() {
                                             if sqr_dist(point, &outlier) < EPS {
-                                                if !outlier_ids.contains(&post.id) {
-                                                    session.give(post.clone());
+                                                if !people_ids.contains(&post.person_id) {
+                                                    session.give(post.person_id);
+                                                    people_ids.insert(&post.person_id);
                                                 }
-                                                outlier_ids.insert(&post.id);
                                             }
                                         }
                                     }
