@@ -234,8 +234,7 @@ pub fn run() {
                             notificator.for_each(|cap, _, notificator| {
                                 notificator.notify_at(cap.delayed(&(cap.time() + NOTIFY_PERIOD)));
 
-                                let possible_outliers =
-                                    stash.extract(NOTIFY_PERIOD, *cap.time());
+                                let possible_outliers = stash.extract(NOTIFY_PERIOD, *cap.time());
                                 for (point, _) in possible_outliers.iter() {
                                     points.push(*point);
                                 }

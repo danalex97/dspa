@@ -82,8 +82,7 @@ pub fn run() {
                         p_input.for_each(|_, input| {
                             input.swap(&mut active_post_snapshot);
                             for (post_id, engaged_people) in active_post_snapshot.clone() {
-                                let entry =
-                                    engaged.entry(post_id).or_insert(engaged_people.len());
+                                let entry = engaged.entry(post_id).or_insert(engaged_people.len());
                                 *entry = engaged_people.len();
                             }
                         });
