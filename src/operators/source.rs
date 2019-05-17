@@ -50,8 +50,7 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
         let consumer: BaseConsumer = consumer_config.create().unwrap();
         consumer.subscribe(&[&topic]).expect("Failed to subscribe");
 
-        source(self, "Source", |capability, info| {
-            let mut cap = Some(capability);
+        source(self, "Source", |mut capability, info| {
             //let mut message_stream = consumer.start();
             let activator = self.activator_for(&info.address[..]);
             move |output| {
@@ -69,24 +68,20 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
 
                                 if &record[0] == "Watermark" {
                                     let watermarked = D::from_watermark(&record[1]);
-                                    cap.as_mut().unwrap().downgrade(&watermarked.timestamp());
+                                    if watermarked.timestamp() < *capability.time() {
+                                        println!(
+                                            "{} {}",
+                                            watermarked.timestamp(),
+                                            capability.time()
+                                        );
+                                    } else {
+                                        capability.downgrade(&watermarked.timestamp());
+                                        output.session(&capability).give(watermarked);
+                                    }
                                 } else {
                                     match D::from_record(record) {
                                         Ok(record) => {
-                                            if let Some(cap) = cap.as_mut() {
-                                                let capability_time = cap.time().clone();
-                                                let candidate_time =
-                                                    record.timestamp() - FIXED_BOUNDED_DELAY;
-
-                                                /*
-                                                // I have a tighter bound for downgrading the capability
-                                                if capability_time < candidate_time {
-                                                    cap.downgrade(&candidate_time);
-                                                }
-                                                */
-
-                                                output.session(&cap).give(record);
-                                            }
+                                            output.session(&capability).give(record);
                                         }
                                         Err(_) => {}
                                     }

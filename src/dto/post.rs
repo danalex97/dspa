@@ -1,16 +1,16 @@
 extern crate chrono;
 extern crate csv;
 
-use crate::dto::common::{maybe_record, Watermarkable};
 use crate::dto::common::parse_vector;
+use crate::dto::common::{maybe_record, Watermarkable};
 use crate::dto::common::{Importable, Timestamped};
 
 use chrono::DateTime;
 use csv::StringRecord;
 
 use std::error::Error;
-use std::vec::Vec;
 use std::net::Ipv4Addr;
+use std::vec::Vec;
 
 #[derive(Deserialize, Serialize, Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Post {
@@ -66,14 +66,13 @@ impl Importable<Post> for Post {
 }
 
 impl Watermarkable for Post {
-
     fn from_watermark(watermark: &str) -> Post {
         Post {
             id: 0,
             person_id: 0,
             timestamp: watermark.parse().unwrap(),
             image_file: None,
-            location_ip: Ipv4Addr::new(0,0,0,0),
+            location_ip: Ipv4Addr::new(0, 0, 0, 0),
             browser_used: "".to_string(),
             language: "".to_string(),
             content: "".to_string(),
@@ -81,10 +80,13 @@ impl Watermarkable for Post {
             forum_id: 0,
             place_id: 0,
             likes: 0,
-            is_watermark: true
+            is_watermark: true,
         }
     }
 
+    fn is_watermark(&self) -> bool {
+        self.is_watermark
+    }
 }
 
 impl Timestamped for Post {

@@ -1,4 +1,4 @@
-use crate::dto::common::Timestamped;
+use crate::dto::common::{Timestamped, Watermarkable};
 use std::collections::HashMap;
 use timely::dataflow::channels::pact::ParallelizationContract;
 use timely::dataflow::operators::generic::operator::Operator;
@@ -9,31 +9,37 @@ pub trait Buffer<G: Scope, P: ParallelizationContract<usize, D>, D: Data> {
     fn buffer(&self, pact: P, delay: usize) -> Stream<G, D>;
 }
 
-impl<G: Scope<Timestamp = usize>, P: ParallelizationContract<usize, D>, D: Data + Timestamped>
-    Buffer<G, P, D> for Stream<G, D>
+impl<
+        G: Scope<Timestamp = usize>,
+        P: ParallelizationContract<usize, D>,
+        D: Data + Timestamped + Watermarkable,
+    > Buffer<G, P, D> for Stream<G, D>
 {
     fn buffer(&self, pact: P, delay: usize) -> Stream<G, D> {
-        let mut stash = HashMap::new();
-        let mut epoch_start = 0;
-        self.unary_notify(pact, "Buffer", None, move |input, output, notificator| {
-            let mut vec = Vec::new();
-            input.for_each(|cap, data| {
-                data.swap(&mut vec);
-                for datum in vec.drain(..) {
-                    let time = datum.timestamp().clone();
-                    if time > epoch_start + delay {
-                        notificator.notify_at(cap.delayed(&(time + delay)));
-                        epoch_start = time;
+        let mut data_stash = vec![];
+        self.unary(pact, "Buffer", move |cap, info| {
+            move |input, output| {
+                let mut vector = vec![];
+                while let Some((time, data)) = input.next() {
+                    data.swap(&mut vector);
+                    let mut needs_release = false;
+                    for d in vector.drain(..) {
+                        if d.is_watermark() {
+                            needs_release = true;
+                        } else {
+                            data_stash.push((d.timestamp().clone(), d));
+                        }
                     }
-                    stash.entry(epoch_start).or_insert(vec![]).push(datum);
+                    if needs_release {
+                        // Release everything up to watermark
+                        let mut session = output.session(&time);
+                        data_stash.sort_by(|(t1, _), (t2, _)| t1.partial_cmp(t2).unwrap());
+                        for (post_time, post) in data_stash.drain(..) {
+                            session.give(post.clone());
+                        }
+                    }
                 }
-            });
-
-            notificator.for_each(|cap, _, _| {
-                if let Some(mut vec) = stash.remove(&(cap.time() - delay)) {
-                    output.session(&cap).give_iterator(vec.drain(..));
-                }
-            })
+            }
         })
     }
 }

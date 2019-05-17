@@ -43,6 +43,10 @@ impl Watermarkable for Like {
             is_watermark: true,
         }
     }
+
+    fn is_watermark(&self) -> bool {
+        self.is_watermark
+    }
 }
 
 impl Timestamped for Like {

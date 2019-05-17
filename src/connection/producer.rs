@@ -8,7 +8,6 @@ use chrono::{DateTime, Duration, FixedOffset};
 use rand::Rng;
 use rdkafka::config::ClientConfig;
 use rdkafka::producer::{FutureProducer, FutureRecord};
-use std::collections::binary_heap::BinaryHeap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -44,7 +43,7 @@ impl Producer {
         let f = File::open(file_name).unwrap();
         let f = BufReader::new(f);
 
-        let mut stash: Stash<String> = Stash::new();
+        let mut stash = Stash::new();
 
         let mut epoch_start_time = start_time.clone();
 
@@ -64,7 +63,10 @@ impl Producer {
                     // Gen watermark
                     stash.stash(
                         epoch_start_time.timestamp() as usize,
-                        "Watermark|".to_owned() + &epoch_start_time.timestamp().to_string(),
+                        (
+                            epoch_start_time,
+                            "Watermark|".to_owned() + &epoch_start_time.timestamp().to_string(),
+                        ),
                     );
                     epoch_start_time =
                         epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64);
@@ -73,11 +75,12 @@ impl Producer {
                     (epoch_start_time.timestamp() - old_time) as usize,
                     epoch_start_time.timestamp() as usize,
                 );
-                for stashed_line in stashed_lines.drain(..) {
+                for (timestamp, stashed_line) in stashed_lines.drain(..) {
                     self.producer.send(
                         FutureRecord::to(&self.topic)
                             .payload(&stashed_line)
-                            .key(&self.key.to_string()),
+                            .key(&self.key.to_string())
+                            .timestamp(timestamp.timestamp()),
                         0,
                     );
                     self.key += 1;
@@ -92,7 +95,7 @@ impl Producer {
             let offset =
                 Duration::seconds(rand::thread_rng().gen_range(1, FIXED_BOUNDED_DELAY) as i64);
             let insertion_time = creation_time + offset;
-            stash.stash(insertion_time.timestamp() as usize, line);
+            stash.stash(insertion_time.timestamp() as usize, (insertion_time, line));
             cnt += 1;
         }
 

@@ -12,6 +12,7 @@ pub trait Importable<T> {
 
 pub trait Watermarkable {
     fn from_watermark(watermark: &str) -> Self;
+    fn is_watermark(&self) -> bool;
 }
 
 pub trait Timestamped {
