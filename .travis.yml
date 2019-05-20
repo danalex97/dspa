@@ -26,6 +26,4 @@ script:
     - cargo fmt --all -- --check
     - cargo build
     - cargo test
-
-after_success:
     - cargo coveralls

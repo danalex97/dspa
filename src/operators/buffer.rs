@@ -1,15 +1,20 @@
 extern crate csv;
 extern crate timely;
 
-use crate::dto::common::{Importable, Timestamped, Watermarkable};
+#[cfg(test)]
 use crate::dto::post::Post;
+#[cfg(test)]
+use crate::dto::common::Importable;
+#[cfg(test)]
+use timely::dataflow::InputHandle;
+#[cfg(test)]
+use timely::dataflow::channels::pact::Pipeline;
 
-use csv::StringRecord;
+use crate::dto::common::{Timestamped, Watermarkable};
 
-use timely::dataflow::channels::pact::{ParallelizationContract, Pipeline};
+use timely::dataflow::channels::pact::ParallelizationContract;
 use timely::dataflow::operators::generic::operator::Operator;
-use timely::dataflow::operators::{Input, Inspect, Probe};
-use timely::dataflow::{InputHandle, Scope, Stream};
+use timely::dataflow::{Scope, Stream};
 use timely::Data;
 
 pub trait Buffer<G: Scope, P: ParallelizationContract<usize, D>, D: Data> {
