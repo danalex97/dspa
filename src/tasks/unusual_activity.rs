@@ -1,7 +1,6 @@
 extern crate rand;
 extern crate timely;
 
-use crate::connection::producer::FIXED_BOUNDED_DELAY;
 use crate::dsa::stash::*;
 use crate::dto::post::Post;
 use crate::operators::buffer::Buffer;
@@ -202,8 +201,7 @@ pub fn run() {
     timely::execute_from_args(std::env::args(), |worker| {
         worker.dataflow::<usize, _, _>(|scope| {
             let posts = scope.kafka_string_source::<Post>("posts".to_string());
-            let buffered_posts =
-                posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY);
+            let buffered_posts = posts.buffer(Exchange::new(|p: &Post| p.id as u64));
 
             let mut points: Vec<Point> = vec![];
             let mut centers: Vec<Point> = vec![];

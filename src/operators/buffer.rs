@@ -5,7 +5,7 @@ use timely::dataflow::{Scope, Stream};
 use timely::Data;
 
 pub trait Buffer<G: Scope, P: ParallelizationContract<usize, D>, D: Data> {
-    fn buffer(&self, pact: P, delay: usize) -> Stream<G, D>;
+    fn buffer(&self, pact: P) -> Stream<G, D>;
 }
 
 impl<
@@ -14,7 +14,7 @@ impl<
         D: Data + Timestamped + Watermarkable,
     > Buffer<G, P, D> for Stream<G, D>
 {
-    fn buffer(&self, pact: P, _delay: usize) -> Stream<G, D> {
+    fn buffer(&self, pact: P) -> Stream<G, D> {
         let mut data_stash = vec![];
         self.unary(pact, "Buffer", move |_, _| {
             move |input, output| {

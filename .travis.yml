@@ -20,6 +20,7 @@ rust:
 before_install:
     - export PATH=$HOME/.cargo/bin:$PATH
     - cargo install cargo-travis
+    - cargo install rustfmt
 
 script:
     - cargo fmt --all -- --check

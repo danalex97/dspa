@@ -29,13 +29,8 @@ pub fn run() {
             let comments = scope.kafka_string_source::<Comment>("comments".to_string());
             let likes = scope.kafka_string_source::<Like>("likes".to_string());
 
-            let buffered_likes = likes.buffer(
-                Exchange::new(|l: &Like| l.post_id as u64),
-                FIXED_BOUNDED_DELAY,
-            );
-
-            let buffered_posts =
-                posts.buffer(Exchange::new(|p: &Post| p.id as u64), FIXED_BOUNDED_DELAY);
+            let buffered_likes = likes.buffer(Exchange::new(|l: &Like| l.post_id as u64));
+            let buffered_posts = posts.buffer(Exchange::new(|p: &Post| p.id as u64));
 
             let linked_comments = comments.broadcast().link_replies(
                 &buffered_posts,
