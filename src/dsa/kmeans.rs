@@ -1,8 +1,10 @@
 use rand::Rng;
 use std::cmp::Ordering::Equal;
+use std::f64;
 
 pub type Point = (f64, f64);
 pub const EPS: f64 = 0.00001;
+pub const SQR_DIST_FACTOR: f64 = 2.;
 
 pub fn sqr_dist((x, y): &Point, (x2, y2): &Point) -> f64 {
     (x - x2) * (x - x2) + (y - y2) * (y - y2)
@@ -89,11 +91,11 @@ pub fn compute_centers(
     relevant_centers
 }
 
-pub fn compute_outliers(centers: &Vec<Point>, points: &Vec<Point>) -> Vec<Point> {
+pub fn compute_outliers(centers: &Vec<Point>, points: &Vec<Point>, percentile: f64) -> Vec<Point> {
     // calculate distances to closest cluster
     let mut dist = vec![];
     for point in points.iter() {
-        let mut min_dist = 2.;
+        let mut min_dist = f64::INFINITY;
         for center in centers.iter() {
             if sqr_dist(center, point) < min_dist {
                 min_dist = sqr_dist(center, point);
@@ -104,12 +106,12 @@ pub fn compute_outliers(centers: &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
 
     // compute percentile
     dist.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Equal));
-    let pct = (0.99 * dist.len() as f64) as usize;
+    let pct = (percentile * dist.len() as f64) as usize;
 
     // find minimum distance for an outlier
-    let mut dist_outlier = 2.;
+    let mut dist_outlier = f64::INFINITY;
     for i in pct..dist.len() - 1 {
-        if dist[i + 1] - dist[i] > (dist[i] - dist[i - 1]) * 2. {
+        if dist[i + 1] - dist[i] > (dist[i] - dist[i - 1]) * SQR_DIST_FACTOR {
             dist_outlier = dist[i + 1];
             break;
         }
@@ -118,7 +120,7 @@ pub fn compute_outliers(centers: &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
     // find outliers
     let mut outliers = vec![];
     for point in points.iter() {
-        let mut min_dist = 2.;
+        let mut min_dist = f64::INFINITY;
         for center in centers.iter() {
             if sqr_dist(center, point) < min_dist {
                 min_dist = sqr_dist(center, point);
@@ -131,4 +133,88 @@ pub fn compute_outliers(centers: &Vec<Point>, points: &Vec<Point>) -> Vec<Point>
     }
 
     outliers
+}
+
+#[cfg(test)]
+mod kmeans_tests {
+    use crate::dsa::kmeans::*;
+
+    #[test]
+    fn test_custers_computed_correctly() {
+        let points = vec![
+            (0., 0.),
+            (1., 0.),
+            (0., 1.),
+            (1., 1.),
+            (5., 5.),
+            (5., 6.),
+            (6., 5.),
+            (6., 6.),
+        ];
+
+        let centers = vec![(0.5, 0.5), (5.5, 5.5)];
+
+        assert_eq!(
+            compute_clusters(&centers, &points)[0],
+            vec![(0., 0.), (1., 0.), (0., 1.), (1., 1.),]
+        );
+        assert_eq!(
+            compute_clusters(&centers, &points)[1],
+            vec![(5., 5.), (5., 6.), (6., 5.), (6., 6.),]
+        );
+    }
+
+    #[test]
+    fn test_centers_computed_correctly() {
+        let points = vec![
+            (0., 0.),
+            (1., 0.),
+            (0., 1.),
+            (1., 1.),
+            (5., 5.),
+            (5., 6.),
+            (6., 5.),
+            (6., 6.),
+        ];
+        let mut centers = compute_centers(&vec![], &points, 2, 4);
+        centers.sort_by(|a, b| a.partial_cmp(b).unwrap_or(Equal));
+
+        assert_eq!(centers, vec![(0.5, 0.5), (5.5, 5.5),],);
+    }
+
+    #[test]
+    fn test_centers_without_coverage_eliminated() {
+        let points = vec![
+            (0., 0.),
+            (1., 0.),
+            (0., 1.),
+            (1., 1.),
+            (5., 5.),
+            (5., 6.),
+            (6., 5.),
+            (6., 6.),
+        ];
+
+        assert_eq!(compute_centers(&vec![], &points, 2, 5), vec![]);
+    }
+
+    #[test]
+    fn test_outliers_computed_correctly() {
+        let points = vec![
+            (0., 0.),
+            (1., 0.),
+            (0., 1.),
+            (1., 1.),
+            (5., 5.),
+            (5., 6.),
+            (6., 5.),
+            (6., 6.),
+            (7.5, 7.5),
+            (-10., -2.),
+        ];
+
+        let centers = vec![(0.5, 0.5), (5.5, 5.5)];
+
+        assert_eq!(compute_outliers(&centers, &points, 0.8), vec![(-10., -2.),]);
+    }
 }

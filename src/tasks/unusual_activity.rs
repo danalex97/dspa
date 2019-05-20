@@ -16,11 +16,13 @@ use timely::dataflow::channels::pact::{Exchange, Pipeline};
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::operators::inspect::Inspect;
 
-const MAX_POST_LENGTH: usize = 64;
+const OUTLIER_PERECENTILE: f64 = 0.99;
 const NUM_CLUSTERS: usize = 10;
 const MIN_COVERAGE: usize = 30;
-const NOTIFY_PERIOD: usize = 12 * 60 * 60; // seconds
 const MIN_POINTS: usize = 2000;
+
+const MAX_POST_LENGTH: usize = 64;
+const NOTIFY_PERIOD: usize = 12 * 60 * 60; // seconds
 
 fn get_data_point(text: &String) -> Option<Point> {
     let mut alpha_text = text.clone();
@@ -115,7 +117,8 @@ pub fn run() {
                                         NUM_CLUSTERS,
                                         MIN_COVERAGE,
                                     );
-                                    let outliers = compute_outliers(&centers, &points);
+                                    let outliers =
+                                        compute_outliers(&centers, &points, OUTLIER_PERECENTILE);
 
                                     // plot points for debugging
                                     plotter.plot_points(&centers, &points, &outliers);
