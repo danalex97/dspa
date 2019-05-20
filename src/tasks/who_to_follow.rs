@@ -1,5 +1,6 @@
 extern crate timely;
 
+use crate::connection::producer::FIXED_BOUNDED_DELAY;
 use crate::operators::buffer::Buffer;
 use crate::operators::source::KafkaSource;
 
