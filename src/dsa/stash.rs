@@ -27,38 +27,43 @@ impl<T: Debug> Stashable<T> for Stash<T> {
     }
 }
 
-#[test]
-fn test_stash_doesnt_take_last_element() {
-    let mut stash: Stash<u32> = Stash::new();
+#[cfg(test)]
+mod stash_tests {
+    use crate::dsa::stash::{Stash, Stashable};
 
-    stash.stash(0, 1);
-    stash.stash(1, 2);
-    stash.stash(2, 3);
-    stash.stash(3, 4);
+    #[test]
+    fn test_stash_doesnt_take_last_element() {
+        let mut stash: Stash<u32> = Stash::new();
 
-    let vec = stash.extract(3, 3);
-    assert!(vec == vec![1, 2, 3]);
-}
+        stash.stash(0, 1);
+        stash.stash(1, 2);
+        stash.stash(2, 3);
+        stash.stash(3, 4);
 
-#[test]
-fn test_stashed_elements_are_consumed() {
-    let mut stash: Stash<u32> = Stash::new();
+        let vec = stash.extract(3, 3);
+        assert!(vec == vec![1, 2, 3]);
+    }
 
-    stash.stash(0, 1);
-    stash.stash(1, 2);
-    stash.stash(2, 3);
-    stash.stash(3, 4);
+    #[test]
+    fn test_stashed_elements_are_consumed() {
+        let mut stash: Stash<u32> = Stash::new();
 
-    let vec = stash.extract(3, 3);
-    assert!(vec == vec![1, 2, 3]);
+        stash.stash(0, 1);
+        stash.stash(1, 2);
+        stash.stash(2, 3);
+        stash.stash(3, 4);
 
-    stash.stash(3, 4);
-    stash.stash(3, 1);
+        let vec = stash.extract(3, 3);
+        assert!(vec == vec![1, 2, 3]);
 
-    let vec = stash.extract(3, 3);
-    let vec2: Vec<u32> = vec![];
-    assert!(vec == vec2);
+        stash.stash(3, 4);
+        stash.stash(3, 1);
 
-    let vec = stash.extract(1, 4);
-    assert!(vec == vec![4, 4, 1]);
+        let vec = stash.extract(3, 3);
+        let vec2: Vec<u32> = vec![];
+        assert!(vec == vec2);
+
+        let vec = stash.extract(1, 4);
+        assert!(vec == vec![4, 4, 1]);
+    }
 }

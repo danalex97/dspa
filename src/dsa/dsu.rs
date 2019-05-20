@@ -95,37 +95,42 @@ impl<K: Hash + Eq + Clone + Debug, V> Dsu<K, V> {
     }
 }
 
-#[test]
-fn test_dsu() {
-    let mut dsu: Dsu<usize, &str> = Dsu::new();
+#[cfg(test)]
+mod dsu_tests {
+    use crate::dsa::dsu::Dsu;
 
-    dsu.insert(2, "a");
-    dsu.insert(5, "b");
-    dsu.insert(1, "c");
+    #[test]
+    fn test_dsu() {
+        let mut dsu: Dsu<usize, &str> = Dsu::new();
 
-    assert!(dsu.key(2) == Some(&2));
-    assert!(dsu.key(5) == Some(&5));
-    assert!(dsu.key(1) == Some(&1));
-    assert!(dsu.key(3) == None);
+        dsu.insert(2, "a");
+        dsu.insert(5, "b");
+        dsu.insert(1, "c");
 
-    assert!(dsu.value(2) == Some(&"a"));
-    assert!(dsu.value(5) == Some(&"b"));
-    assert!(dsu.value(1) == Some(&"c"));
-    assert!(dsu.value(3) == None);
+        assert!(dsu.key(2) == Some(&2));
+        assert!(dsu.key(5) == Some(&5));
+        assert!(dsu.key(1) == Some(&1));
+        assert!(dsu.key(3) == None);
 
-    dsu.union(2, 5);
+        assert!(dsu.value(2) == Some(&"a"));
+        assert!(dsu.value(5) == Some(&"b"));
+        assert!(dsu.value(1) == Some(&"c"));
+        assert!(dsu.value(3) == None);
 
-    assert!(dsu.value(2) == Some(&"a"));
-    assert!(dsu.value(5) == Some(&"a"));
+        dsu.union(2, 5);
 
-    dsu.insert(2, "d");
-    assert!(dsu.value(2) == Some(&"d"));
-    assert!(dsu.value(5) == Some(&"d"));
+        assert!(dsu.value(2) == Some(&"a"));
+        assert!(dsu.value(5) == Some(&"a"));
 
-    dsu.insert(5, "e");
-    assert!(dsu.value(5) == Some(&"e"));
-    assert!(dsu.value(2) == Some(&"e"));
+        dsu.insert(2, "d");
+        assert!(dsu.value(2) == Some(&"d"));
+        assert!(dsu.value(5) == Some(&"d"));
 
-    dsu.insert(1, "d");
-    assert!(dsu.value(1) == Some(&"d"));
+        dsu.insert(5, "e");
+        assert!(dsu.value(5) == Some(&"e"));
+        assert!(dsu.value(2) == Some(&"e"));
+
+        dsu.insert(1, "d");
+        assert!(dsu.value(1) == Some(&"d"));
+    }
 }
