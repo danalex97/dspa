@@ -32,6 +32,9 @@ pub fn run() {
             let buffered_likes = likes.buffer(Exchange::new(|l: &Like| l.post_id as u64));
             let buffered_posts = posts.buffer(Exchange::new(|p: &Post| p.id as u64));
 
+            // buffered_posts.inspect(|x| println!("{:?}", x));
+            // buffered_likes.inspect(|x| println!("{:?}", x));
+
             let linked_comments = comments.broadcast().link_replies(
                 &buffered_posts,
                 Pipeline,

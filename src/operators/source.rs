@@ -54,7 +54,7 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
             let activator = self.activator_for(&info.address[..]);
             move |output| {
                 activator.activate();
-                for message in consumer.poll(Duration::from_secs(1)) {
+                for message in consumer.poll(Duration::from_secs(0)) {
                     match message {
                         Err(_) => println!("Error while reading from stream."),
                         Ok(m) => match m.payload_view::<str>() {
@@ -68,11 +68,8 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
                                 if &record[0] == "Watermark" {
                                     let watermarked = D::from_watermark(&record[1]);
                                     if watermarked.timestamp() < *capability.time() {
-                                        println!(
-                                            "{} {}",
-                                            watermarked.timestamp(),
-                                            capability.time()
-                                        );
+                                        // stuff on kafka from previous runs, we will igore them
+                                        // until we arrive at a relevant event
                                     } else {
                                         capability.downgrade(&watermarked.timestamp());
                                         output.session(&capability).give(watermarked);

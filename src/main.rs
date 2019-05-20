@@ -11,6 +11,7 @@ mod tasks;
 mod util;
 
 use clap::{App, Arg, SubCommand};
+use std::thread;
 use tasks::{load, post_stats, unusual_activity, who_to_follow};
 
 fn main() {
@@ -28,6 +29,10 @@ fn main() {
                 .about("Active posts(12 hours) statistics updated every 30 minutes."),
         )
         .subcommand(SubCommand::with_name("who-to-follow").about("Friend recommendation service."))
+        .subcommand(
+            SubCommand::with_name("unusual-activity")
+                .about("Suggests users that post unusual content."),
+        )
         .get_matches();
 
     if let ("load", Some(args)) = matches.subcommand() {
@@ -45,10 +50,17 @@ fn main() {
     }
 
     if let ("who-to-follow", _) = matches.subcommand() {
-        // TODO: load static data from path
         who_to_follow::run();
     }
 
-    load::run(Some(10000));
+    if let ("unusual_activity", _) = matches.subcommand() {
+        unusual_activity::run();
+    }
+
+    // load::run(Some(1000));
+    // post_stats::run();
+    thread::spawn(move || {
+        load::run(Some(10000));
+    });
     unusual_activity::run();
 }
