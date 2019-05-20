@@ -25,17 +25,33 @@ function usage() {
 }
 
 function start_kafka() {
+    start_processes
+    create_all_topics
+    echo "Kafka ready."
+}
+
+function start_processes() {
     echo "Starting processes..."
     nohup bin/zookeeper-server-start.sh config/zookeeper.properties >/dev/null 2>&1 &
     nohup bin/kafka-server-start.sh config/server.properties >/dev/null 2>&1 &
     nohup bin/kafka-server-start.sh config/server-1.properties >/dev/null 2>&1 &
     nohup bin/kafka-server-start.sh config/server-2.properties >/dev/null 2>&1 &
     echo "Processes started."
+}
+
+function create_all_topics() {
     echo "Creating topics..."
-    sleep 2
-    make_topic "posts"
-    make_topic "comments"
-    make_topic "likes"
+
+    # wait for Zookeper
+    ZK_PORT=`cat config/zookeeper.properties | grep "clientPort" | cut -d "=" -f 2`
+    while ! nc -z localhost $ZK_PORT; do
+        sleep 0.1
+    done
+
+    retry make_topic "comments"
+    retry make_topic "posts"
+    retry make_topic "likes"
+
     echo "Topics created."
 }
 
@@ -57,6 +73,19 @@ function delete_topic() {
 
 function make_topic() {
     bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic $1
+}
+
+function retry() {
+    func=$1
+    shift
+    while [ true ]; do
+        $func $@ 2>/dev/null
+        if [ $? -eq 0 ]; then
+            break
+        fi
+        echo "Retrying..."
+        sleep 0.1
+    done
 }
 
 function list_topics() {
