@@ -49,14 +49,14 @@ impl<
 
 #[cfg(test)]
 mod buffer_tests {
-    use crate::dto::post::Post;
     use crate::dto::common::{Importable, Watermarkable};
+    use crate::dto::post::Post;
     use crate::operators::buffer::Buffer;
 
-    use csv::StringRecord;
-    use timely::dataflow::InputHandle;
-    use timely::dataflow::channels::pact::Pipeline;
     use crate::operators::buffer::timely::dataflow::operators::{Input, Inspect, Probe};
+    use csv::StringRecord;
+    use timely::dataflow::channels::pact::Pipeline;
+    use timely::dataflow::InputHandle;
 
     #[test]
     fn test_buffer_with_watermarks_emits_corret_number_of_events() {
