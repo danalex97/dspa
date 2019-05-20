@@ -3,7 +3,6 @@ extern crate rand;
 extern crate rdkafka;
 
 use crate::dsa::stash::{Stash, Stashable};
-use chrono::offset::TimeZone;
 use chrono::{DateTime, Duration, FixedOffset};
 use rand::Rng;
 use rdkafka::config::ClientConfig;

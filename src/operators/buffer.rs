@@ -1,5 +1,4 @@
 use crate::dto::common::{Timestamped, Watermarkable};
-use std::collections::HashMap;
 use timely::dataflow::channels::pact::ParallelizationContract;
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::{Scope, Stream};
@@ -15,9 +14,9 @@ impl<
         D: Data + Timestamped + Watermarkable,
     > Buffer<G, P, D> for Stream<G, D>
 {
-    fn buffer(&self, pact: P, delay: usize) -> Stream<G, D> {
+    fn buffer(&self, pact: P, _delay: usize) -> Stream<G, D> {
         let mut data_stash = vec![];
-        self.unary(pact, "Buffer", move |cap, info| {
+        self.unary(pact, "Buffer", move |_, _| {
             move |input, output| {
                 let mut vector = vec![];
                 while let Some((time, data)) = input.next() {
@@ -34,7 +33,7 @@ impl<
                         // Release everything up to watermark
                         let mut session = output.session(&time);
                         data_stash.sort_by(|(t1, _), (t2, _)| t1.partial_cmp(t2).unwrap());
-                        for (post_time, post) in data_stash.drain(..) {
+                        for (_post_time, post) in data_stash.drain(..) {
                             session.give(post.clone());
                         }
                     }

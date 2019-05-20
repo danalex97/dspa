@@ -4,7 +4,6 @@ extern crate rdkafka;
 extern crate rdkafka_sys;
 extern crate timely;
 
-use crate::connection::producer::FIXED_BOUNDED_DELAY;
 use crate::dto::common::{Importable, Timestamped, Watermarkable};
 
 use timely::dataflow::operators::generic::operator::source;
