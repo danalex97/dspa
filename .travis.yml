@@ -21,6 +21,7 @@ before_install:
     - export PATH=$HOME/.cargo/bin:$PATH
     - cargo install cargo-travis || echo "Cargo travis cached."
     - cargo install rustfmt || echo "Cargo-fmt cached."
+    - rustup component add rustfmt
 
 script:
     - cargo fmt --all -- --check
