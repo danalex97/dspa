@@ -3,7 +3,7 @@ use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::{Scope, Stream};
 
 use crate::dto::comment::Comment;
-use crate::dto::common::Timestamped;
+use crate::dto::common::{Timestamped, Watermarkable};
 use crate::dto::post::Post;
 
 use crate::dsa::dsu::*;
@@ -88,14 +88,13 @@ where
                         dsu.insert((POST, post.id), Some(post.id));
                     }
 
-                    // notify in the future with delay so that we have the
-                    // guarantee that all replies are attached to comments
-                    notificator.notify_at(cap.delayed(&(cap.time() + delay)));
+                    // notify when all the posts and comments before the current
+                    // watermark have been emitted
+                    notificator.notify_at(cap.retain());
                 });
 
                 notificator.for_each(|cap, _, _| {
-                    // note the time here is in the past since we waited for the delay
-                    let time = *cap.time() - delay;
+                    let time = *cap.time();
                     let mut replies = BinaryHeap::new();
                     let mut all_comments = Vec::new();
 
@@ -103,20 +102,23 @@ where
                     for comment in comments_buffer.extract(delay, time) {
                         all_comments.push(comment.clone());
 
-                        match comment.reply_to_post_id {
-                            Some(post_id) => {
-                                // insert comment if post present
-                                match dsu.value((POST, post_id)) {
-                                    Some(_) => dsu.insert((COMMENT, comment.id), None),
-                                    None => { /* the post is on a different worker */ }
-                                }
+                        // if the comment is a watermark we don't process it
+                        if !comment.is_watermark {
+                            match comment.reply_to_post_id {
+                                Some(post_id) => {
+                                    // insert comment if post present
+                                    match dsu.value((POST, post_id)) {
+                                        Some(_) => dsu.insert((COMMENT, comment.id), None),
+                                        None => { /* the post is on a different worker */ }
+                                    }
 
-                                // add edge
-                                add_edge(&mut dsu, (POST, post_id), (COMMENT, comment.id));
-                            }
-                            None => {
-                                // reply
-                                replies.push(comment);
+                                    // add edge
+                                    add_edge(&mut dsu, (POST, post_id), (COMMENT, comment.id));
+                                }
+                                None => {
+                                    // reply
+                                    replies.push(comment);
+                                }
                             }
                         }
                     }
@@ -141,6 +143,11 @@ where
                     // attach the post_id to all comments/replies
                     let mut session = output.session(&cap);
                     for mut comment in all_comments.drain(..) {
+                        if comment.is_watermark() {
+                            session.give(comment);
+                            continue;
+                        }
+
                         match dsu.value((COMMENT, comment.id)) {
                             None => { /* comment/reply is not attached to our post */ }
                             Some(maybe_post) => {
