@@ -45,7 +45,7 @@ pub fn run() {
             let buffered_likes = likes.buffer(Exchange::new(|l: &Like| l.post_id as u64));
             let buffered_posts = posts.buffer(Exchange::new(|p: &Post| p.id as u64));
 
-            let linked_comments = comments.broadcast().link_replies(
+            let linked_comments = comments.broadcast().buffer(Pipeline).link_replies(
                 &buffered_posts,
                 Pipeline,
                 Pipeline,
@@ -82,7 +82,7 @@ pub fn run() {
 
             let mut first_notified = false;
             let mut post_info = HashMap::new(); // map: post_id -> (forum, tags)
-            let mut active_post_snapshot = Vec::new(); // vector of (post_id, interacting_users)
+            let mut active_posts_at_time: HashMap<usize, Vec<(u32, HashSet<u32>)>> = HashMap::new();
             active_posts
                 .binary_notify(
                     &buffered_posts,
@@ -101,16 +101,17 @@ pub fn run() {
                                     .or_insert((post.forum_id, post.tags));
                             }
                             if !first_notified {
-                                notificator.notify_at(cap.delayed(
-                                    &(cap.time() + COLLECTION_PERIOD - FIXED_BOUNDED_DELAY),
-                                ));
+                                notificator
+                                    .notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
                                 first_notified = true;
                             }
                         });
 
                         // keep the latest snapshot that we received
-                        ap_input.for_each(|_, input| {
-                            input.swap(&mut active_post_snapshot);
+                        ap_input.for_each(|cap, input| {
+                            let mut vec = vec![];
+                            input.swap(&mut vec);
+                            active_posts_at_time.insert(*cap.time(), vec);
                         });
 
                         // do the actual computation at each notification
@@ -122,8 +123,11 @@ pub fn run() {
 
                             // you have the guarantee that we will have a new snapshot before the
                             // next notification, so we can drain it
-                            for (post_id, engaged_people) in active_post_snapshot.drain(..) {
-                                // println!("{:?} {:?}", post_id, engaged_people);
+                            for (post_id, engaged_people) in active_posts_at_time
+                                .remove(cap.time())
+                                .unwrap_or(vec![])
+                                .drain(..)
+                            {
                                 for person_id in engaged_people {
                                     if people_of_interest.contains(&person_id) {
                                         posts_of_interest
@@ -235,7 +239,7 @@ pub fn run() {
                         })
                     },
                 )
-                .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
+                .inspect_batch(|t, xs| println!("Recommendations @{:?}: {:?}", t, xs));
         });
     })
     .unwrap();
