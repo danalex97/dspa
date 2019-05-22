@@ -32,9 +32,6 @@ pub fn run() {
             let buffered_likes = likes.buffer(Exchange::new(|l: &Like| l.post_id as u64));
             let buffered_posts = posts.buffer(Exchange::new(|p: &Post| p.id as u64));
 
-            // buffered_posts.inspect(|x| println!("{:?}", x));
-            // buffered_likes.inspect(|x| println!("{:?}", x));
-
             let linked_comments = comments.broadcast().link_replies(
                 &buffered_posts,
                 Pipeline,
@@ -54,34 +51,25 @@ pub fn run() {
             let mut engaged = HashMap::new();
             let mut active_post_snapshot = Vec::new();
             active_posts
-                .binary_notify(
-                    &linked_comments,
+                .unary_notify(
                     Pipeline,
-                    Pipeline,
-                    "Counts",
+                    "Unique People Counts",
                     None,
-                    move |p_input, c_input, output, notificator| {
-                        // only used for synchonization
-                        // [TODO]: check if needed
-                        let mut c_data = Vec::new();
-                        c_input.for_each(|cap, input| {
-                            input.swap(&mut c_data);
-                            for _ in c_data.drain(..) {
-                                if !first_notified_engaged {
-                                    notificator.notify_at(cap.delayed(
-                                        &(cap.time() + 2 * COLLECTION_PERIOD - FIXED_BOUNDED_DELAY),
-                                    ));
-                                    first_notified_engaged = true;
-                                }
-                            }
-                        });
-
+                    move |p_input, output, notificator| {
                         // actual processing
-                        p_input.for_each(|_, input| {
+                        p_input.for_each(|cap, input| {
                             input.swap(&mut active_post_snapshot);
                             for (post_id, engaged_people) in active_post_snapshot.clone() {
                                 let entry = engaged.entry(post_id).or_insert(engaged_people.len());
                                 *entry = engaged_people.len();
+                            }
+
+                            // Generate the first notification
+                            if !first_notified_engaged {
+                                notificator.notify_at(cap.delayed(
+                                    &(cap.time() + 2 * COLLECTION_PERIOD),
+                                ));
+                                first_notified_engaged = true;
                             }
                         });
 
@@ -102,69 +90,69 @@ pub fn run() {
                 )
                 .inspect_batch(|t, xs| println!("@t {:?}: {:?}", t, xs));
 
-            let mut comment_counts: HashMap<u32, u64> = HashMap::new();
-            let mut reply_counts: HashMap<u32, u64> = HashMap::new();
-            let mut first_notified = false;
-            let mut active_post_snapshot = Vec::new();
-            active_posts
-                .binary_notify(
-                    &linked_comments,
-                    Pipeline,
-                    Pipeline,
-                    "Counts",
-                    None,
-                    move |p_input, c_input, output, notificator| {
-                        let mut c_data = Vec::new();
-                        c_input.for_each(|cap, input| {
-                            input.swap(&mut c_data);
-                            for comment in c_data.drain(..) {
-                                if !first_notified {
-                                    notificator.notify_at(cap.delayed(
-                                        &(cap.time() + COLLECTION_PERIOD - FIXED_BOUNDED_DELAY),
-                                    ));
-                                    first_notified = true;
-                                }
-                                match comment.reply_to_comment_id {
-                                    Some(_) => {
-                                        // Reply
-                                        let count = reply_counts
-                                            .entry(comment.reply_to_post_id.unwrap())
-                                            .or_insert(0);
-                                        *count += 1;
-                                    }
-                                    None => {
-                                        // Comment
-                                        let count = comment_counts
-                                            .entry(comment.reply_to_post_id.unwrap())
-                                            .or_insert(0);
-                                        *count += 1;
-                                    }
-                                }
-                            }
-                        });
-
-                        p_input.for_each(|_, input| {
-                            input.swap(&mut active_post_snapshot);
-                        });
-
-                        notificator.for_each(|cap, _, notificator| {
-                            notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
-                            let mut session = output.session(&cap);
-                            for (post_id, _) in active_post_snapshot.drain(..) {
-                                let replies = match reply_counts.get(&post_id) {
-                                    Some(count) => *count,
-                                    None => 0,
-                                };
-                                let comments = match comment_counts.get(&post_id) {
-                                    Some(count) => *count,
-                                    None => 0,
-                                };
-                                session.give((post_id, comments, replies));
-                            }
-                        })
-                    },
-                )
-                .inspect_batch(|t, xs| println!("@t2 {:?}: {:?}", t, xs));
+            // let mut comment_counts: HashMap<u32, u64> = HashMap::new();
+            // let mut reply_counts: HashMap<u32, u64> = HashMap::new();
+            // let mut first_notified = false;
+            // let mut active_post_snapshot = Vec::new();
+            // active_posts
+            //     .binary_notify(
+            //         &linked_comments,
+            //         Pipeline,
+            //         Pipeline,
+            //         "Counts",
+            //         None,
+            //         move |p_input, c_input, output, notificator| {
+            //             let mut c_data = Vec::new();
+            //             c_input.for_each(|cap, input| {
+            //                 input.swap(&mut c_data);
+            //                 for comment in c_data.drain(..) {
+            //                     if !first_notified {
+            //                         notificator.notify_at(cap.delayed(
+            //                             &(cap.time() + COLLECTION_PERIOD - FIXED_BOUNDED_DELAY),
+            //                         ));
+            //                         first_notified = true;
+            //                     }
+            //                     match comment.reply_to_comment_id {
+            //                         Some(_) => {
+            //                             // Reply
+            //                             let count = reply_counts
+            //                                 .entry(comment.reply_to_post_id.unwrap())
+            //                                 .or_insert(0);
+            //                             *count += 1;
+            //                         }
+            //                         None => {
+            //                             // Comment
+            //                             let count = comment_counts
+            //                                 .entry(comment.reply_to_post_id.unwrap())
+            //                                 .or_insert(0);
+            //                             *count += 1;
+            //                         }
+            //                     }
+            //                 }
+            //             });
+            //
+            //             p_input.for_each(|_, input| {
+            //                 input.swap(&mut active_post_snapshot);
+            //             });
+            //
+            //             notificator.for_each(|cap, _, notificator| {
+            //                 notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
+            //                 let mut session = output.session(&cap);
+            //                 for (post_id, _) in active_post_snapshot.drain(..) {
+            //                     let replies = match reply_counts.get(&post_id) {
+            //                         Some(count) => *count,
+            //                         None => 0,
+            //                     };
+            //                     let comments = match comment_counts.get(&post_id) {
+            //                         Some(count) => *count,
+            //                         None => 0,
+            //                     };
+            //                     session.give((post_id, comments, replies));
+            //                 }
+            //             })
+            //         },
+            //     )
+            //     .inspect_batch(|t, xs| println!("@t2 {:?}: {:?}", t, xs));
         });
     })
     .unwrap();
