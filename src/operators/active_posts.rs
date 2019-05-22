@@ -3,7 +3,7 @@ use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::{Scope, Stream};
 
 use crate::dto::comment::Comment;
-use crate::dto::common::Timestamped;
+use crate::dto::common::{Timestamped, Watermarkable};
 use crate::dto::like::Like;
 
 use crate::dsa::stash::*;
@@ -64,7 +64,8 @@ where
                         let time = comment.timestamp().clone();
                         comments_buffer.stash(time, comment);
                     }
-                    // deliver notifications for both for synchonization
+                    // deliver only one notification since the streams are
+                    // synchronized by the same initial watermark
                     notificator.notify_at(cap.retain());
                 });
                 let mut l_data = Vec::new();
@@ -74,22 +75,22 @@ where
                         let time = like.timestamp().clone();
                         likes_buffer.stash(time, like);
                     }
-                    // deliver notifications for both for synchonization
-                    notificator.notify_at(cap.retain());
                 });
 
                 notificator.for_each(|cap, _, _| {
                     // get timestamps for likes and comments
-                    let comments = comments_buffer.extract(delay, *cap.time());
-                    let likes = likes_buffer.extract(delay, *cap.time());
+                    let raw_comments = comments_buffer.extract(delay, *cap.time());
+                    let raw_likes = likes_buffer.extract(delay, *cap.time());
 
-                    let likes: Vec<_> = likes
+                    let likes: Vec<_> = raw_likes
                         .iter()
-                        .map(|l: &Like| (l.timestamp, l.post_id, l.person_id))
+                        .filter(|l| !l.is_watermark())
+                        .map(|l| (l.timestamp, l.post_id, l.person_id))
                         .collect();
-                    let mut comments: Vec<_> = comments
+                    let mut comments: Vec<_> = raw_comments
                         .iter()
-                        .map(|c: &Comment| (c.timestamp, c.reply_to_post_id.unwrap(), c.person_id))
+                        .filter(|c| !c.is_watermark())
+                        .map(|c| (c.timestamp, c.reply_to_post_id.unwrap(), c.person_id))
                         .collect();
 
                     // group all timestamp together
