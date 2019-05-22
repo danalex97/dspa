@@ -163,3 +163,94 @@ where
         )
     }
 }
+
+#[cfg(test)]
+#[rustfmt::skip]
+mod link_replies_tests {
+    extern crate timely;
+
+    use crate::dto::common::Watermarkable;
+    use crate::dto::post::Post;
+    use crate::dto::comment::Comment;
+
+    use timely::dataflow::channels::pact::Pipeline;
+    use timely::dataflow::InputHandle;
+    use timely::dataflow::operators::{Input, Inspect, Probe};
+
+    use crate::operators::link_replies::LinkReplies;
+
+    #[test]
+    fn test_link_replies_links_all_comments () {
+        timely::execute_from_args(std::env::args(), |worker| {
+            let mut posts_input = InputHandle::new();
+            let mut comments_input = InputHandle::new();
+
+            let default_post = Post{is_watermark:false, ..Post::from_watermark("0")};
+            let default_comment = Comment{is_watermark:false, ..Comment::from_watermark("0")};
+            let posts_data = vec![
+                Post{id:1, timestamp:7, ..default_post.clone()},
+                Post{id:2, timestamp:7, ..default_post.clone()},
+                Post{id:3, timestamp:7, ..default_post.clone()},
+                Post::from_watermark("10"),
+                Post::from_watermark("15"),
+                Post::from_watermark("20"),
+            ];
+            let comments_data = vec![
+                Comment{id:1, reply_to_post_id: Some(1), timestamp:5, ..default_comment.clone()},
+                Comment{id:2, reply_to_post_id: Some(3), timestamp:5, ..default_comment.clone()},
+                Comment{id:3, reply_to_comment_id: Some(2), timestamp:6, ..default_comment.clone()},
+                Comment::from_watermark("10"),
+                Comment{id:4, reply_to_comment_id: Some(1), timestamp:11, ..default_comment.clone()},
+                Comment{id:5, reply_to_comment_id: Some(3), timestamp:12, ..default_comment.clone()},
+                Comment{id:6, reply_to_comment_id: Some(2), timestamp:13, ..default_comment.clone()},
+                Comment::from_watermark("15"),
+                Comment::from_watermark("20"),
+            ];
+
+
+            let (posts_probe, comments_probe) = worker.dataflow(|scope| {
+                let posts = scope.input_from(&mut posts_input);
+                let comments = scope.input_from(&mut comments_input);
+
+                let get_reply_to_post_id = |xs: &[Comment]| xs.iter()
+                    .filter(|x| !x.is_watermark())
+                    .filter(|x| x.reply_to_post_id != None)
+                    .map(|x| x.reply_to_post_id.unwrap())
+                    .collect::<Vec<_>>();
+
+                comments.link_replies(
+                    &posts,
+                    Pipeline,
+                    Pipeline,
+                    5,
+                ).inspect_batch(move |t, xs: &[Comment]| match t {
+                    10  => assert_eq!(get_reply_to_post_id(xs), vec![1, 3, 3]),
+                    15  => assert_eq!(get_reply_to_post_id(xs), vec![1, 3, 3]),
+                    _  => unreachable!(),
+                });
+
+                (posts.probe(), comments.probe())
+            });
+
+            let batches = vec![
+                (10, posts_data[0..4].to_vec(), comments_data[0..4].to_vec()),
+                (15, posts_data[4..5].to_vec(), comments_data[4..8].to_vec()),
+                (20, posts_data[5..6].to_vec(), comments_data[8..9].to_vec()),
+            ];
+            for (t, mut p_data, mut c_data) in batches {
+                posts_input.send_batch(&mut p_data);
+                posts_input.advance_to(t);
+                comments_input.send_batch(&mut c_data);
+                comments_input.advance_to(t);
+
+                while posts_probe.less_than(posts_input.time()) {
+                     worker.step();
+                }
+                while comments_probe.less_than(comments_input.time()) {
+                     worker.step();
+                }
+            }
+        })
+        .unwrap();
+    }
+}

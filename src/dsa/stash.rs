@@ -17,7 +17,12 @@ impl<T: Debug> Stashable<T> for Stash<T> {
     // Extracts everything on the interval [time_end-length, time_end)
     fn extract(&mut self, length: usize, time_end: usize) -> Vec<T> {
         let mut all = Vec::new();
-        for t in time_end - length..time_end {
+        let start = if time_end < length {
+            0
+        } else {
+            time_end - length
+        };
+        for t in start..time_end {
             match self.remove(&t) {
                 Some(mut vec) => all.append(&mut vec),
                 None => {}

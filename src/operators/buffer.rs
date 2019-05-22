@@ -89,13 +89,13 @@ mod buffers_tests {
                 posts.probe()
             });
 
-            let post_batches = vec![
+            let batches = vec![
                 (8, posts_data[0..2].to_vec()),
                 (10, posts_data[2..4].to_vec()),
                 (13, posts_data[4..7].to_vec()),
                 (15, posts_data[7..8].to_vec()),
             ];
-            for (t, mut data) in post_batches {
+            for (t, mut data) in batches {
                 posts_input.send_batch(&mut data);
                 posts_input.advance_to(t);
                 while probe.less_than(posts_input.time()) {
