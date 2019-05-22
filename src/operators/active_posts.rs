@@ -69,7 +69,7 @@ where
                     notificator.notify_at(cap.retain());
                 });
                 let mut l_data = Vec::new();
-                l_input.for_each(|cap, input| {
+                l_input.for_each(|_, input| {
                     input.swap(&mut l_data);
                     for like in l_data.drain(..) {
                         let time = like.timestamp().clone();

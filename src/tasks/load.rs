@@ -19,28 +19,11 @@ pub fn run(records: Option<usize>) {
         creation_time = Some(DateTime::parse_from_rfc3339(fields[2]).unwrap());
         break;
     }
-    println!(
-        "{} posts loaded to Kafka.",
-        Producer::new("posts".to_string()).write_file(
-            POSTS_PATH,
-            records,
-            &(creation_time.unwrap())
-        )
+    Producer::new("posts".to_string()).write_file(POSTS_PATH, records, &(creation_time.unwrap()));
+    Producer::new("comments".to_string()).write_file(
+        COMMENTS_PATH,
+        records,
+        &(creation_time.unwrap()),
     );
-    println!(
-        "{} comments loaded to Kafka.",
-        Producer::new("comments".to_string()).write_file(
-            COMMENTS_PATH,
-            records,
-            &(creation_time.unwrap())
-        )
-    );
-    println!(
-        "{} likes loaded to Kafka.",
-        Producer::new("likes".to_string()).write_file(
-            LIKES_PATH,
-            records,
-            &(creation_time.unwrap())
-        )
-    );
+    Producer::new("likes".to_string()).write_file(LIKES_PATH, records, &(creation_time.unwrap()));
 }
