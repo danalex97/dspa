@@ -49,56 +49,57 @@ impl<
 }
 
 #[cfg(test)]
-mod buffer_tests {
-    use crate::dto::common::{Importable, Watermarkable};
-    use crate::dto::post::Post;
-    use crate::operators::buffer::Buffer;
+#[rustfmt::skip]
+mod buffers_tests {
+    extern crate timely;
 
-    use crate::operators::buffer::timely::dataflow::operators::{Input, Inspect, Probe};
-    use csv::StringRecord;
+    use crate::dto::common::Watermarkable;
+    use crate::dto::post::Post;
+
     use timely::dataflow::channels::pact::Pipeline;
     use timely::dataflow::InputHandle;
+    use timely::dataflow::operators::{Input, Inspect, Probe};
+
+    use crate::operators::buffer::Buffer;
 
     #[test]
-    fn test_buffer_with_watermarks_emits_corret_number_of_events() {
+    fn test_buffer_emits_correct_batches() {
         timely::execute_from_args(std::env::args(), |worker| {
-            let mut input = InputHandle::new();
+            let mut posts_input = InputHandle::new();
+
+            let default_post = Post{is_watermark:false, ..Post::from_watermark("0")};
+            let posts_data = vec![
+                Post{id:1, timestamp:1, ..default_post.clone()},
+                Post{id:2, timestamp:7, ..default_post.clone()},
+                Post{id:3, timestamp:3, ..default_post.clone()},
+                Post::from_watermark("10"),
+                Post{id:4, timestamp:11, ..default_post.clone()},
+                Post{id:5, timestamp:13, ..default_post.clone()},
+                Post{id:6, timestamp:12, ..default_post.clone()},
+                Post::from_watermark("15"),
+            ];
 
             let probe = worker.dataflow(|scope| {
-                let input = scope.input_from(&mut input);
-
-                input.buffer(Pipeline).inspect_batch(|t, xs| match t {
-                    2 => assert!(xs.len() == 2),
-                    6 => assert!(xs.len() == 3),
-                    _ => unreachable!(),
+                let posts = scope.input_from(&mut posts_input);
+                posts.buffer(Pipeline).inspect_batch(|t, xs: &[Post]| match t {
+                    8  => assert_eq!(xs.iter().map(|x| x.timestamp).collect::<Vec<_>>(), vec![1,3,7,10]),
+                    13 => assert_eq!(xs.iter().map(|x| x.timestamp).collect::<Vec<_>>(), vec![11,12,13,15]),
+                    _  => unreachable!(),
                 });
-                let probe = input.probe();
-
-                probe
+                posts.probe()
             });
 
-            let input_data = vec![
-                "1052740|332|2012-02-02T06:00:08Z|photo105274.jpg|14.102.224.16|Firefox||||154380|38",
-                "1052750|332|2012-02-02T06:00:09Z|photo105275.jpg|14.102.224.16|Firefox||||154380|38",
-                "Watermark|1052751",
-                "1052760|332|2012-02-02T06:00:10Z|photo105276.jpg|14.102.224.16|Firefox||||154380|38",
-                "1052770|332|2012-02-02T06:00:11Z|photo105277.jpg|14.102.224.16|Firefox||||154380|38",
-                "1052770|332|2012-02-02T06:00:11Z|photo105277.jpg|14.102.224.16|Firefox||||154380|38",
-                "Watermark|1052752",
-                "1052780|332|2012-02-02T06:00:12Z|photo105278.jpg|62.114.0.3|Firefox||||154380|26",
+            let post_batches = vec![
+                (8, posts_data[0..2].to_vec()),
+                (10, posts_data[2..4].to_vec()),
+                (13, posts_data[4..7].to_vec()),
+                (15, posts_data[7..8].to_vec()),
             ];
-            for round in 0..input_data.len() {
-                let v: Vec<&str> = input_data[round].split("|").collect();
-                let r = StringRecord::from(v);
-                if &r[0] == "Watermark" {
-                    input.send(Post::from_watermark(&r[1]))
-                } else {
-                    input.send(Post::from_record(r).unwrap())
-                }
-
-                input.advance_to(round + 1);
-                while probe.less_than(input.time()) {
-                    worker.step();
+            for (t, mut data) in post_batches {
+                posts_input.send_batch(&mut data);
+                posts_input.advance_to(t);
+                while probe.less_than(posts_input.time()) {
+                     worker.step();
                 }
             }
         })
