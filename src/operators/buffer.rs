@@ -29,9 +29,10 @@ impl<
                     for d in vector.drain(..) {
                         if d.is_watermark() {
                             needs_release = true;
-                        } else {
-                            data_stash.push((d.timestamp().clone(), d));
                         }
+                        // Even the watermark will propagate so that we report data all the time
+                        // for the first 2 tasks
+                        data_stash.push((d.timestamp().clone(), d));
                     }
                     if needs_release {
                         // Release everything up to watermark
