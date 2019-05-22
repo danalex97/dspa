@@ -19,16 +19,18 @@ use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::operators::Inspect;
 
 use std::collections::HashMap;
+use timely::Configuration;
 
 const COLLECTION_PERIOD: usize = 1800; // seconds
 const ACTIVE_POST_PERIOD: usize = 43200; // seconds
 
 pub fn run() {
-    timely::execute_from_args(std::env::args(), |worker| {
+    timely::execute(Configuration::Process(4), |worker| {
+        let index = worker.index();
         worker.dataflow::<usize, _, _>(|scope| {
-            let posts = scope.kafka_string_source::<Post>("posts".to_string());
-            let comments = scope.kafka_string_source::<Comment>("comments".to_string());
-            let likes = scope.kafka_string_source::<Like>("likes".to_string());
+            let posts = scope.kafka_string_source::<Post>("posts".to_string(), index);
+            let comments = scope.kafka_string_source::<Comment>("comments".to_string(), index);
+            let likes = scope.kafka_string_source::<Like>("likes".to_string(), index);
 
             let buffered_likes = likes.buffer(Exchange::new(|l: &Like| l.post_id as u64));
             let buffered_posts = posts.buffer(Exchange::new(|p: &Post| p.id as u64));

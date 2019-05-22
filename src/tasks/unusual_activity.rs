@@ -72,8 +72,9 @@ fn get_data_point(text: &String) -> Option<Point> {
 
 pub fn run() {
     timely::execute_from_args(std::env::args(), |worker| {
+        let index = worker.index();
         worker.dataflow::<usize, _, _>(|scope| {
-            let posts = scope.kafka_string_source::<Post>("posts".to_string());
+            let posts = scope.kafka_string_source::<Post>("posts".to_string(), index);
             let buffered_posts = posts.buffer(Exchange::new(|p: &Post| p.id as u64));
 
             let mut points: Vec<Point> = vec![];

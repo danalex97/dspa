@@ -11,7 +11,7 @@ pub trait Importable<T> {
 }
 
 pub trait Watermarkable {
-    fn from_watermark(watermark: &str) -> Self;
+    fn from_watermark(watermark: &str, index: usize) -> Self;
     fn is_watermark(&self) -> bool;
 }
 

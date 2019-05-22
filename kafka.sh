@@ -72,7 +72,7 @@ function delete_topic() {
 }
 
 function make_topic() {
-    bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 1 --topic $1
+    bin/kafka-topics.sh --create --zookeeper localhost:2181 --replication-factor 1 --partitions 4 --topic $1
 }
 
 function retry() {

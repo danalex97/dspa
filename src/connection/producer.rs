@@ -60,36 +60,53 @@ impl Producer {
             let fields: Vec<&str> = line.split("|").collect();
             let creation_time = DateTime::parse_from_rfc3339(fields[2]).unwrap();
 
-            if creation_time > epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64) {
+            if creation_time <= epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64) {} else {
                 let old_time = epoch_start_time.timestamp();
                 // Generate some watermarks for every five minute period between
                 // and output the stashed lines
                 while creation_time
                     > epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64)
-                {
-                    // Gen watermark
-                    stash.stash(
-                        epoch_start_time.timestamp() as usize,
-                        (
-                            epoch_start_time,
-                            "Watermark|".to_owned() + &epoch_start_time.timestamp().to_string(),
-                        ),
-                    );
-                    epoch_start_time =
-                        epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64);
-                }
+                    {
+                        // Gen watermark
+                        for i in 0..4 {
+                            stash.stash(
+                                epoch_start_time.timestamp() as usize,
+                                (
+                                    epoch_start_time,
+                                    "Watermark|".to_owned() + &epoch_start_time.timestamp().to_string(),
+                                    Some(i),
+                                ),
+                            );
+                        }
+                        epoch_start_time =
+                            epoch_start_time + Duration::seconds(FIXED_BOUNDED_DELAY as i64);
+                    }
                 let mut stashed_lines = stash.extract(
                     (epoch_start_time.timestamp() - old_time + 1) as usize,
                     epoch_start_time.timestamp() as usize,
                 );
-                for (timestamp, stashed_line) in stashed_lines.drain(..) {
-                    let future = self.producer.send(
-                        FutureRecord::to(&self.topic)
-                            .payload(&stashed_line)
-                            .key(&self.key.to_string())
-                            .timestamp(timestamp.timestamp()),
-                        0,
-                    );
+                for (timestamp, stashed_line, maybe_partition) in stashed_lines.drain(..) {
+                    let future = match maybe_partition {
+                        None => {
+                            self.producer.send(
+                                FutureRecord::to(&self.topic)
+                                    .payload(&stashed_line)
+                                    .key(&self.key.to_string())
+                                    .timestamp(timestamp.timestamp()),
+                                0,
+                            )
+                        },
+                        Some(partition) => {
+                            self.producer.send(
+                                FutureRecord::to(&self.topic)
+                                    .payload(&stashed_line)
+                                    .partition(partition)
+                                    .key(&self.key.to_string())
+                                    .timestamp(timestamp.timestamp()),
+                                0,
+                            )
+                        }
+                    };
                     self.key += 1;
                     futures.push(future);
                     if let Some(lines) = lines {
@@ -109,7 +126,7 @@ impl Producer {
             let offset =
                 Duration::seconds(rand::thread_rng().gen_range(1, FIXED_BOUNDED_DELAY) as i64);
             let insertion_time = creation_time + offset;
-            stash.stash(insertion_time.timestamp() as usize, (insertion_time, line));
+            stash.stash(insertion_time.timestamp() as usize, (insertion_time, line, None));
             cnt += 1;
         }
 

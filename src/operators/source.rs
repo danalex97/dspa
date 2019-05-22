@@ -18,11 +18,13 @@ use rdkafka::message::Message;
 use self::rdkafka::consumer::BaseConsumer;
 use csv::StringRecord;
 use std::time::Duration;
+use rdkafka::TopicPartitionList;
 
 pub trait KafkaSource<G: Scope> {
     fn kafka_string_source<D: Importable<D> + Watermarkable + Data + Timestamped>(
         &self,
         topic: String,
+        index: usize,
     ) -> Stream<G, D>;
 }
 
@@ -30,6 +32,7 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
     fn kafka_string_source<D: Importable<D> + Watermarkable + Data + Timestamped>(
         &self,
         topic: String,
+        index: usize,
     ) -> Stream<G, D> {
         // Extract Kafka topic.
         let brokers = "localhost:9092";
@@ -46,8 +49,11 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
             .set("bootstrap.servers", &brokers);
 
         // Create a Kafka consumer.
+        let mut topic_partiton_list = TopicPartitionList::new();
+        topic_partiton_list.add_partition(&topic, index as i32);
         let consumer: BaseConsumer = consumer_config.create().unwrap();
         consumer.subscribe(&[&topic]).expect("Failed to subscribe");
+        consumer.assign(&topic_partiton_list).expect("Unable to configure partition correctly");
 
         source(self, "Source", |mut capability, info| {
             //let mut message_stream = consumer.start();
@@ -66,7 +72,7 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
                                 let record = StringRecord::from(v);
 
                                 if &record[0] == "Watermark" {
-                                    let watermarked = D::from_watermark(&record[1]);
+                                    let watermarked = D::from_watermark(&record[1], index);
                                     if watermarked.timestamp() < *capability.time() {
                                         // stuff on kafka from previous runs, we will igore them
                                         // until we arrive at a relevant event

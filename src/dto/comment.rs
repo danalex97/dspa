@@ -61,7 +61,7 @@ impl Importable<Comment> for Comment {
 }
 
 impl Watermarkable for Comment {
-    fn from_watermark(watermark: &str) -> Self {
+    fn from_watermark(watermark: &str, _index: usize) -> Self {
         Self {
             id: 0,
             person_id: 0,

@@ -35,10 +35,10 @@ impl Importable<Like> for Like {
 }
 
 impl Watermarkable for Like {
-    fn from_watermark(watermark: &str) -> Like {
+    fn from_watermark(watermark: &str, index: usize) -> Like {
         Like {
             person_id: 0,
-            post_id: 0,
+            post_id: index as u32,
             timestamp: watermark.parse().unwrap(),
             is_watermark: true,
         }

@@ -66,9 +66,9 @@ impl Importable<Post> for Post {
 }
 
 impl Watermarkable for Post {
-    fn from_watermark(watermark: &str) -> Post {
+    fn from_watermark(watermark: &str, index: usize) -> Post {
         Post {
-            id: 0,
+            id: index as u32,
             person_id: 0,
             timestamp: watermark.parse().unwrap(),
             image_file: None,
