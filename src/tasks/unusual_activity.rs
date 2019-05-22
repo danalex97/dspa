@@ -12,6 +12,8 @@ use std::collections::HashSet;
 use std::iter::FromIterator;
 use std::string::ToString;
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::Hasher;
 use timely::dataflow::channels::pact::{Exchange, Pipeline};
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::operators::inspect::Inspect;
@@ -75,7 +77,14 @@ pub fn run() {
         let index = worker.index();
         worker.dataflow::<usize, _, _>(|scope| {
             let posts = scope.kafka_string_source::<Post>("posts".to_string(), index);
-            let buffered_posts = posts.buffer(Exchange::new(|p: &Post| p.id as u64));
+            let buffered_posts = posts.buffer(Exchange::new(|p: &Post| {
+                if p.is_watermark {
+                    return p.id as u64;
+                }
+                let mut hasher = DefaultHasher::new();
+                hasher.write_u32(p.id);
+                hasher.finish()
+            }));
 
             let mut points: Vec<Point> = vec![];
             let mut centers: Vec<Point> = vec![];

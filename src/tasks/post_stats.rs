@@ -18,7 +18,9 @@ use timely::dataflow::operators::broadcast::Broadcast;
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::operators::Inspect;
 
+use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
+use std::hash::Hasher;
 use timely::Configuration;
 
 const COLLECTION_PERIOD: usize = 1800; // seconds
@@ -32,8 +34,22 @@ pub fn run() {
             let comments = scope.kafka_string_source::<Comment>("comments".to_string(), index);
             let likes = scope.kafka_string_source::<Like>("likes".to_string(), index);
 
-            let buffered_likes = likes.buffer(Exchange::new(|l: &Like| l.post_id as u64));
-            let buffered_posts = posts.buffer(Exchange::new(|p: &Post| p.id as u64));
+            let buffered_likes = likes.buffer(Exchange::new(|l: &Like| {
+                if l.is_watermark {
+                    return l.post_id as u64;
+                }
+                let mut hasher = DefaultHasher::new();
+                hasher.write_u32(l.post_id);
+                hasher.finish()
+            }));
+            let buffered_posts = posts.buffer(Exchange::new(|p: &Post| {
+                if p.is_watermark {
+                    return p.id as u64;
+                }
+                let mut hasher = DefaultHasher::new();
+                hasher.write_u32(p.id);
+                hasher.finish()
+            }));
 
             let linked_comments = comments.broadcast().link_replies(
                 &buffered_posts,

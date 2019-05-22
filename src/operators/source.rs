@@ -53,7 +53,9 @@ impl<G: Scope<Timestamp = usize>> KafkaSource<G> for G {
         topic_partiton_list.add_partition(&topic, index as i32);
         let consumer: BaseConsumer = consumer_config.create().unwrap();
         consumer.subscribe(&[&topic]).expect("Failed to subscribe");
-        consumer.assign(&topic_partiton_list).expect("Unable to configure partition correctly");
+        consumer
+            .assign(&topic_partiton_list)
+            .expect("Unable to configure partition correctly");
 
         source(self, "Source", |mut capability, info| {
             //let mut message_stream = consumer.start();
