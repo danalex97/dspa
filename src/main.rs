@@ -1,4 +1,3 @@
-#[macro_use]
 extern crate clap;
 #[macro_use]
 extern crate serde_derive;
@@ -16,13 +15,20 @@ use tasks::{load, post_stats, unusual_activity, who_to_follow};
 
 fn main() {
     let matches = App::new("DSPA")
-        .subcommand(
-            SubCommand::with_name("load")
-                .about("Load data from dataset to Kafka.")
-                .arg(
-                    Arg::with_name("records")
-                        .help("Number of records loaded.(all data is loaded when not provided)"),
-                ),
+        .arg(
+            Arg::with_name("records")
+                .short("r")
+                .long("records")
+                .help("Set the number of records to read.")
+                .takes_value(true),
+        )
+        .arg(
+            Arg::with_name("path")
+                .short("p")
+                .long("path")
+                .default_value("data/1k-users-sorted")
+                .help("Set the path to the directory containing streams & tables")
+                .takes_value(true),
         )
         .subcommand(
             SubCommand::with_name("post-stats")
@@ -35,32 +41,35 @@ fn main() {
         )
         .get_matches();
 
-    if let ("load", Some(args)) = matches.subcommand() {
-        let records = match value_t!(args.value_of("records"), usize) {
-            Ok(records) => Some(records),
-            Err(_) => Some(1000),
-        };
-
-        load::run(records);
-        return;
-    }
+    let records = match matches.is_present("records") {
+        true => Some(
+            matches
+                .value_of("records")
+                .unwrap()
+                .parse()
+                .expect("records must be integer"),
+        ),
+        false => None,
+    };
 
     if let ("post-stats", _) = matches.subcommand() {
+        thread::spawn(move || {
+            load::run(records);
+        });
         post_stats::run();
     }
 
     if let ("who-to-follow", _) = matches.subcommand() {
+        thread::spawn(move || {
+            load::run(records);
+        });
         who_to_follow::run();
     }
 
     if let ("unusual_activity", _) = matches.subcommand() {
+        thread::spawn(move || {
+            load::run(records);
+        });
         unusual_activity::run();
     }
-
-    // load::run(Some(1000));
-    // post_stats::run();
-    thread::spawn(move || {
-        load::run(Some(10000));
-    });
-    unusual_activity::run();
 }
