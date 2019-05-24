@@ -32,7 +32,7 @@ function start_kafka() {
 
 function start_processes() {
     echo "Starting processes..."
-    nohup bin/zookeeper-server-start.sh config/zookeeper.properties >/dev/null 2>&1 &
+    nohup bin/zookeeper-server-start.sh $DIR/confs/zookeeper.properties >/dev/null 2>&1 &
     nohup bin/kafka-server-start.sh $DIR/confs/server-0.properties >/dev/null 2>&1 &
     nohup bin/kafka-server-start.sh $DIR/confs/server-1.properties >/dev/null 2>&1 &
     nohup bin/kafka-server-start.sh $DIR/confs/server-2.properties >/dev/null 2>&1 &
@@ -43,7 +43,7 @@ function create_all_topics() {
     echo "Creating topics..."
 
     # wait for Zookeper
-    ZK_PORT=`cat config/zookeeper.properties | grep "clientPort" | cut -d "=" -f 2`
+    ZK_PORT=`cat $DIR/confs/zookeeper.properties | grep "clientPort" | cut -d "=" -f 2`
     while ! nc -z localhost $ZK_PORT; do
         sleep 0.1
     done
