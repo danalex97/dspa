@@ -6,7 +6,7 @@ In order to run this project it is required to use the `stable` Rust toolchain w
 
 The `init.sh` script can be used to download either of the datasets used in the project. Try running the script to see the available options.
 
-In addition to Rust, it is necessary to have a Kafka/Zookeeper cluster running. As a convenience, we have provided a script `kafka.sh` for managing the cluster. Before running a task, it is necessary to launch the cluster using `./kafka.sh -s` which will also create the required topics across 4 partitions. After running the tasks, it is recommended to delete the cluster using `./kafka.sh -k`.
+In addition to Rust, it is necessary to have a Kafka/Zookeeper cluster running. As a convenience, we have provided a script `kafka.sh` for managing the cluster. Before running a task, it is necessary to launch the cluster using `./kafka.sh -s` which will also create the required topics across 4 partitions. After running the tasks, it is recommended to delete the cluster using `./kafka.sh -k`. For the `kafka.sh` script to work, the directory of installation of Kafka has to be specified in environment variable `$KAFKA_DIR`. 
 
 ## Running the tasks
 After starting Kafka using the helper script, each task can be run using `cargo`. Tasks can be ran using the following command:

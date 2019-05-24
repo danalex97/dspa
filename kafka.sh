@@ -159,6 +159,7 @@ function parse_command_line_options() {
 
         shift
     done
+    usage
 }
 
 if [[ ! -v KAFKA_DIR ]]; then
