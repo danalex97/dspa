@@ -33,9 +33,9 @@ function start_kafka() {
 function start_processes() {
     echo "Starting processes..."
     nohup bin/zookeeper-server-start.sh config/zookeeper.properties >/dev/null 2>&1 &
-    nohup bin/kafka-server-start.sh config/server.properties >/dev/null 2>&1 &
-    nohup bin/kafka-server-start.sh config/server-1.properties >/dev/null 2>&1 &
-    nohup bin/kafka-server-start.sh config/server-2.properties >/dev/null 2>&1 &
+    nohup bin/kafka-server-start.sh $DIR/confs/server-0.properties >/dev/null 2>&1 &
+    nohup bin/kafka-server-start.sh $DIR/confs/server-1.properties >/dev/null 2>&1 &
+    nohup bin/kafka-server-start.sh $DIR/confs/server-2.properties >/dev/null 2>&1 &
     echo "Processes started."
 }
 
