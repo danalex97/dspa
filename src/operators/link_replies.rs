@@ -1,4 +1,4 @@
-use timely::dataflow::channels::pact::ParallelizationContract;
+    use timely::dataflow::channels::pact::ParallelizationContract;
 use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::{Scope, Stream};
 
@@ -180,31 +180,31 @@ mod link_replies_tests {
     use crate::operators::link_replies::LinkReplies;
 
     #[test]
-    fn test_link_replies_links_all_comments () {
+    fn test_link_replies_links_all_comments() {
         timely::execute_from_args(std::env::args(), |worker| {
             let mut posts_input = InputHandle::new();
             let mut comments_input = InputHandle::new();
 
-            let default_post = Post{is_watermark:false, ..Post::from_watermark("0")};
-            let default_comment = Comment{is_watermark:false, ..Comment::from_watermark("0")};
+            let default_post = Post{is_watermark:false, ..Post::from_watermark("0", 0)};
+            let default_comment = Comment{is_watermark:false, ..Comment::from_watermark("0", 0)};
             let posts_data = vec![
                 Post{id:1, timestamp:7, ..default_post.clone()},
                 Post{id:2, timestamp:7, ..default_post.clone()},
                 Post{id:3, timestamp:7, ..default_post.clone()},
-                Post::from_watermark("10"),
-                Post::from_watermark("15"),
-                Post::from_watermark("20"),
+                Post::from_watermark("10", 0),
+                Post::from_watermark("15", 0),
+                Post::from_watermark("20", 0),
             ];
             let comments_data = vec![
                 Comment{id:1, reply_to_post_id: Some(1), timestamp:5, ..default_comment.clone()},
                 Comment{id:2, reply_to_post_id: Some(3), timestamp:5, ..default_comment.clone()},
                 Comment{id:3, reply_to_comment_id: Some(2), timestamp:6, ..default_comment.clone()},
-                Comment::from_watermark("10"),
+                Comment::from_watermark("10", 0),
                 Comment{id:4, reply_to_comment_id: Some(1), timestamp:11, ..default_comment.clone()},
                 Comment{id:5, reply_to_comment_id: Some(3), timestamp:12, ..default_comment.clone()},
                 Comment{id:6, reply_to_comment_id: Some(2), timestamp:13, ..default_comment.clone()},
-                Comment::from_watermark("15"),
-                Comment::from_watermark("20"),
+                Comment::from_watermark("15", 0),
+                Comment::from_watermark("20", 0),
             ];
 
 

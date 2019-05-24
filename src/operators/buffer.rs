@@ -67,16 +67,16 @@ mod buffers_tests {
         timely::execute_from_args(std::env::args(), |worker| {
             let mut posts_input = InputHandle::new();
 
-            let default_post = Post{is_watermark:false, ..Post::from_watermark("0")};
+            let default_post = Post{is_watermark:false, ..Post::from_watermark("0", 0)};
             let posts_data = vec![
                 Post{id:1, timestamp:1, ..default_post.clone()},
                 Post{id:2, timestamp:7, ..default_post.clone()},
                 Post{id:3, timestamp:3, ..default_post.clone()},
-                Post::from_watermark("10"),
+                Post::from_watermark("10", 0),
                 Post{id:4, timestamp:11, ..default_post.clone()},
                 Post{id:5, timestamp:13, ..default_post.clone()},
                 Post{id:6, timestamp:12, ..default_post.clone()},
-                Post::from_watermark("15"),
+                Post::from_watermark("15", 0),
             ];
 
             let probe = worker.dataflow(|scope| {
