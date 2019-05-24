@@ -151,7 +151,7 @@ pub fn run() {
                         }
                     },
                 )
-                .inspect(|x| println!("{:?}", x));
+                .inspect_batch(|t, x| println!("@{}: suspicious person #{:?}", t, x));
         })
     })
     .unwrap();
