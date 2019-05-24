@@ -7,20 +7,18 @@ use crate::operators::source::KafkaSource;
 use crate::operators::active_posts::ActivePosts;
 use crate::operators::engaged_users::EngagedUsers;
 use crate::operators::link_replies::LinkReplies;
+use crate::operators::post_counts::PostCounts;
 
 use crate::dto::comment::Comment;
-use crate::dto::common::Watermarkable;
 use crate::dto::like::Like;
 use crate::dto::post::Post;
 
 use timely::dataflow::channels::pact::Exchange;
 use timely::dataflow::channels::pact::Pipeline;
 use timely::dataflow::operators::broadcast::Broadcast;
-use timely::dataflow::operators::generic::operator::Operator;
 use timely::dataflow::operators::Inspect;
 
 use std::collections::hash_map::DefaultHasher;
-use std::collections::HashMap;
 use std::hash::Hasher;
 use timely::Configuration;
 
@@ -71,78 +69,8 @@ pub fn run() {
                 .engaged_users(Pipeline, 2 * COLLECTION_PERIOD)
                 .inspect_batch(|t, xs| println!("#uniquely engaged people {:?}: {:?}", t, xs));
 
-            let mut comment_counts: HashMap<u32, u64> = HashMap::new();
-            let mut reply_counts: HashMap<u32, u64> = HashMap::new();
-            let mut first_notified = false;
-            let mut active_posts_at_time: HashMap<usize, Vec<u32>> = HashMap::new();
             active_posts
-                .binary_notify(
-                    &linked_comments,
-                    Pipeline,
-                    Pipeline,
-                    "Counts",
-                    None,
-                    move |p_input, c_input, output, notificator| {
-                        let mut c_data = Vec::new();
-                        c_input.for_each(|cap, input| {
-                            input.swap(&mut c_data);
-                            for comment in c_data.drain(..) {
-                                if !first_notified {
-                                    notificator
-                                        .notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
-                                    first_notified = true;
-                                }
-
-                                // discard watermarks
-                                if comment.is_watermark() {
-                                    continue;
-                                }
-
-                                match comment.reply_to_comment_id {
-                                    Some(_) => {
-                                        // Reply
-                                        let count = reply_counts
-                                            .entry(comment.reply_to_post_id.unwrap())
-                                            .or_insert(0);
-                                        *count += 1;
-                                    }
-                                    None => {
-                                        // Comment
-                                        let count = comment_counts
-                                            .entry(comment.reply_to_post_id.unwrap())
-                                            .or_insert(0);
-                                        *count += 1;
-                                    }
-                                }
-                            }
-                        });
-
-                        p_input.for_each(|cap, input| {
-                            let vec = input.iter().map(|(x, _)| *x).collect();
-                            active_posts_at_time.insert(*cap.time(), vec);
-                        });
-
-                        notificator.for_each(|cap, _, notificator| {
-                            notificator.notify_at(cap.delayed(&(cap.time() + COLLECTION_PERIOD)));
-                            let mut session = output.session(&cap);
-                            for post_id in active_posts_at_time
-                                .remove(cap.time())
-                                .unwrap_or(vec![])
-                                .drain(..)
-                            {
-                                let replies = match reply_counts.get(&post_id) {
-                                    Some(count) => *count,
-                                    None => 0,
-                                };
-                                let comments = match comment_counts.get(&post_id) {
-                                    Some(count) => *count,
-                                    None => 0,
-                                };
-                                session.give((post_id, comments, replies));
-                            }
-                        })
-                    },
-                )
+                .counts(&linked_comments, Pipeline, Pipeline, COLLECTION_PERIOD)
                 .inspect_batch(|t, xs| println!("#comments and replies {:?}: {:?}", t, xs));
         });
     })

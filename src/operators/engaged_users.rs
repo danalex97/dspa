@@ -8,6 +8,7 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 
 type PostId = u32;
+#[allow(dead_code)]
 type PersonId = u32;
 
 pub trait EngagedUsers<G, P>
