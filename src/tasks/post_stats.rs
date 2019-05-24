@@ -67,11 +67,11 @@ pub fn run() {
 
             active_posts
                 .engaged_users(Pipeline, 2 * COLLECTION_PERIOD)
-                .inspect_batch(|t, xs| println!("#uniquely engaged people {:?}: {:?}", t, xs));
+                .inspect_batch(|t, xs| println!("#uniquely engaged people @t={:?}: {:?}", t, xs));
 
             active_posts
                 .counts(&linked_comments, Pipeline, Pipeline, COLLECTION_PERIOD)
-                .inspect_batch(|t, xs| println!("#comments and replies {:?}: {:?}", t, xs));
+                .inspect_batch(|t, xs| println!("#comments and replies @t={:?}: {:?}", t, xs));
         });
     })
     .unwrap();
