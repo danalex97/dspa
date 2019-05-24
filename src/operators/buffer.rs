@@ -1,4 +1,3 @@
-extern crate csv;
 extern crate timely;
 
 use crate::dto::common::{Timestamped, Watermarkable};

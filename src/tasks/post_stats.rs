@@ -5,6 +5,7 @@ use crate::operators::buffer::Buffer;
 use crate::operators::source::KafkaSource;
 
 use crate::operators::active_posts::ActivePosts;
+use crate::operators::engaged_users::EngagedUsers;
 use crate::operators::link_replies::LinkReplies;
 
 use crate::dto::comment::Comment;
@@ -66,46 +67,8 @@ pub fn run() {
                 ACTIVE_POST_PERIOD,
             );
 
-            let mut first_notified_engaged = false;
-            let mut engaged = HashMap::new();
-            let mut active_post_snapshot = Vec::new();
             active_posts
-                .unary_notify(
-                    Pipeline,
-                    "Unique People Counts",
-                    None,
-                    move |p_input, output, notificator| {
-                        // actual processing
-                        p_input.for_each(|cap, input| {
-                            input.swap(&mut active_post_snapshot);
-                            for (post_id, engaged_people) in active_post_snapshot.clone() {
-                                let entry = engaged.entry(post_id).or_insert(engaged_people.len());
-                                *entry = engaged_people.len();
-                            }
-
-                            // Generate the first notification
-                            if !first_notified_engaged {
-                                notificator
-                                    .notify_at(cap.delayed(&(cap.time() + 2 * COLLECTION_PERIOD)));
-                                first_notified_engaged = true;
-                            }
-                        });
-
-                        notificator.for_each(|cap, _, notificator| {
-                            notificator
-                                .notify_at(cap.delayed(&(cap.time() + 2 * COLLECTION_PERIOD)));
-
-                            let mut session = output.session(&cap);
-                            for (post_id, _) in active_post_snapshot.drain(..) {
-                                let engaged_users = match engaged.get(&post_id) {
-                                    Some(value) => *value,
-                                    None => 0,
-                                };
-                                session.give((post_id, engaged_users));
-                            }
-                        });
-                    },
-                )
+                .engaged_users(Pipeline, 2 * COLLECTION_PERIOD)
                 .inspect_batch(|t, xs| println!("#uniquely engaged people {:?}: {:?}", t, xs));
 
             let mut comment_counts: HashMap<u32, u64> = HashMap::new();

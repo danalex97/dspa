@@ -1,3 +1,4 @@
+extern crate timely;
 
 use timely::dataflow::channels::pact::ParallelizationContract;
 use timely::dataflow::operators::generic::operator::Operator;
