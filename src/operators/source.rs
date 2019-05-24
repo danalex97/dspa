@@ -17,8 +17,8 @@ use rdkafka::message::Message;
 
 use self::rdkafka::consumer::BaseConsumer;
 use csv::StringRecord;
-use std::time::Duration;
 use rdkafka::TopicPartitionList;
+use std::time::Duration;
 
 pub trait KafkaSource<G: Scope> {
     fn kafka_string_source<D: Importable<D> + Watermarkable + Data + Timestamped>(

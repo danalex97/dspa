@@ -27,19 +27,15 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::hash::Hasher;
 use std::iter::FromIterator;
+use std::path::PathBuf;
 use timely::Configuration;
-
-const FORUM_PATH: &str = "data/1k-users-sorted/tables/forum.csv";
-const FORUM_MEMBERS_PATH: &str = "data/1k-users-sorted/tables/forum_hasMember_person.csv";
-const PERSON_PATH: &str = "data/1k-users-sorted/tables/person.csv";
-const PERSON_FRIEND_PATH: &str = "data/1k-users-sorted/tables/person_knows_person.csv";
 
 const COLLECTION_PERIOD: usize = 60 * 60; // seconds
 const ACTIVE_POST_PERIOD: usize = 4 * 60 * 60; // seconds
 const RECOMMENDATIONS: usize = 5;
 
-pub fn run() {
-    timely::execute(Configuration::Process(4), |worker| {
+pub fn run(tables_path: PathBuf) {
+    timely::execute(Configuration::Process(4), move |worker| {
         let index = worker.index();
         worker.dataflow::<usize, _, _>(|scope| {
             let posts = scope.kafka_string_source::<Post>("posts".to_string(), index);
@@ -82,11 +78,17 @@ pub fn run() {
                 vec![129, 986, 618, 296, 814, 379, 441, 655, 836, 929];
 
             // getting the forum map
-            let mut forum_map = csv_to_map::<Forum>(FORUM_PATH);
-            parse_forum_member_csv(FORUM_MEMBERS_PATH, &mut forum_map);
+            let forum_path = tables_path.join("forum.csv");
+            let mut forum_map = csv_to_map::<Forum>(forum_path.to_str().unwrap());
 
-            let mut person_map = csv_to_map::<Person>(PERSON_PATH);
-            parse_person_friends(PERSON_FRIEND_PATH, &mut person_map);
+            let forum_members_path = tables_path.join("forum_hasMember_person.csv");
+            parse_forum_member_csv(forum_members_path.to_str().unwrap(), &mut forum_map);
+
+            let person_path = tables_path.join("person.csv");
+            let mut person_map = csv_to_map::<Person>(person_path.to_str().unwrap());
+
+            let person_friend_path = tables_path.join("person_knows_person.csv");
+            parse_person_friends(person_friend_path.to_str().unwrap(), &mut person_map);
 
             let mut person_forums: HashMap<u32, HashSet<u32>> = HashMap::new();
             for (forum_id, forum) in &forum_map {

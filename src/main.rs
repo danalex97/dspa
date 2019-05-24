@@ -10,7 +10,7 @@ mod tasks;
 mod util;
 
 use clap::{App, Arg, SubCommand};
-use std::thread;
+use std::path::Path;
 use tasks::{load, post_stats, unusual_activity, who_to_follow};
 
 fn main() {
@@ -52,24 +52,32 @@ fn main() {
         false => None,
     };
 
+    let path = matches.value_of("path").unwrap();
+    let path = Path::new(path);
+    if !path.is_dir() {
+        panic!("Specified path is not a directory");
+    }
+
+    let streams_path = path.join("streams");
+    if !streams_path.is_dir() {
+        panic!("Specified path does not contain streams directory");
+    }
+    let tables_path = path.join("tables");
+    if !tables_path.is_dir() {
+        panic!("Specified path does not contain tables directory");
+    }
+
+    load::run(records, &streams_path);
+
     if let ("post-stats", _) = matches.subcommand() {
-        thread::spawn(move || {
-            load::run(records);
-        });
         post_stats::run();
     }
 
     if let ("who-to-follow", _) = matches.subcommand() {
-        thread::spawn(move || {
-            load::run(records);
-        });
-        who_to_follow::run();
+        who_to_follow::run(tables_path);
     }
 
-    if let ("unusual_activity", _) = matches.subcommand() {
-        thread::spawn(move || {
-            load::run(records);
-        });
+    if let ("unusual-activity", _) = matches.subcommand() {
         unusual_activity::run();
     }
 }
