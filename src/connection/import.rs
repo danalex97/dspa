@@ -19,11 +19,9 @@ where
                 if data.is_ok() {
                     let entry = data.unwrap();
                     callback(entry);
-                } else {
-                    eprintln!("Error: {:?}", data);
                 }
             }
-            Err(e) => eprintln!("Error: {:?}", e),
+            Err(_) => {},
         }
     }
 }
