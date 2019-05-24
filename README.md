@@ -1,6 +1,7 @@
 # Data Stream Processing and Analytics Semester Project
 Authors: Alexandru Dan and Matthew Brookes
 
+[![Build Status](https://travis-ci.org/danalex97/dspa.svg?branch=master)](https://travis-ci.org/danalex97/dspa)
 ## Setup
 In order to run this project it is required to use the `stable` Rust toolchain which can be configured using [rustup](https://rustup.rs/).
 
