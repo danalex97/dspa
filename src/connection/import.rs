@@ -21,7 +21,7 @@ where
                     callback(entry);
                 }
             }
-            Err(_) => {},
+            Err(_) => {}
         }
     }
 }
