@@ -10,8 +10,8 @@ clap = "2.31.2"
 csv = "1"
 futures = "0.1"
 rand = "0.6"
-rdkafka = {git = "https://github.com/fede1024/rust-rdkafka"}
-rdkafka-sys = {git = "https://github.com/fede1024/rust-rdkafka", path = "rdkafka-sys" }
+rdkafka = {git = "https://github.com/fede1024/rust-rdkafka", rev="21a3864a"}
+rdkafka-sys = {git = "https://github.com/fede1024/rust-rdkafka", rev="21a3864a"}
 serde = "1.0.90"
 serde_derive = "1.0.90"
 timely = {git = "https://github.com/danalex97/timely-dataflow", features = ["bincode"] }
